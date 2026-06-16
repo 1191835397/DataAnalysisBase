@@ -1,0 +1,51 @@
+# 多源融合策略配置
+# 详见 docs/FUSION_RECONCILE.md
+
+version: "1.0"
+
+datasets:
+  daily_bars:
+    strategy: priority
+    trusted_source: tushare
+    fallback_source: akshare
+    diff_threshold:
+      close_pct: 0.003      # 收盘价相对差异 0.3%
+      volume_pct: 0.05      # 成交量相对差异 5%
+
+  valuation:
+    strategy: median_of_sources
+    min_sources: 2
+    diff_threshold:
+      pe_ttm_pct: 0.05
+      pb_pct: 0.05
+
+  financials:
+    strategy: authoritative
+    trusted_source: tushare
+    fallback_source: akshare
+    diff_threshold:
+      revenue_pct: 0.02     # 营收差异 2% 触发 L2
+      net_profit_pct: 0.03
+      roe_abs: 0.5          # ROE 绝对差 0.5 个百分点
+
+  money_flow:
+    strategy: priority
+    trusted_source: akshare
+    fallback_source: tushare
+
+  news:
+    strategy: union_dedupe
+    dedupe:
+      method: title_similarity
+      threshold: 0.85
+    max_items_per_security: 50
+
+  announcements:
+    strategy: authoritative
+    trusted_source: cninfo
+    fallback_source: akshare
+
+  fund_nav:
+    strategy: priority
+    trusted_source: akshare
+    fallback_source: tushare

@@ -1,0 +1,46 @@
+# 对账严重级别与处理策略
+# 详见 docs/FUSION_RECONCILE.md
+
+version: "1.0"
+
+severity_levels:
+  L0_ignore:
+    description: 舍入误差，自动融合
+    action: auto_merge
+    block_research: false
+
+  L1_notice:
+    description: 轻微差异，记录并取策略值
+    action: merge_with_flag
+    block_research: false
+
+  L2_warning:
+    description: 明显差异，降级置信度，禁止用于交易信号
+    action: merge_with_warning
+    block_research: false
+    downgrade_confidence: 0.2
+
+  L3_critical:
+    description: 严重差异，禁止进入 AI 结论，触发告警
+    action: block_canonical
+    block_research: true
+    alert: true
+
+# 字段级默认阈值（可被 fusion_policy 覆盖）
+field_defaults:
+  close:
+    L1: 0.003
+    L2: 0.005
+    L3: 0.01
+  pe_ttm:
+    L1: 0.02
+    L2: 0.05
+    L3: 0.10
+  revenue:
+    L1: 0.01
+    L2: 0.03
+    L3: 0.05
+  net_profit:
+    L1: 0.02
+    L2: 0.05
+    L3: 0.08

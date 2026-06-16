@@ -1,0 +1,34 @@
+# 自选股 / 关注列表
+# security_id 为平台统一标识
+
+version: "1.0"
+
+watchlist:
+  - security_id: "600519.SH"
+    name: "贵州茅台"
+    type: stock
+    tags: [白酒, 核心持仓]
+    peers: ["000858.SZ", "000568.SZ"]
+
+  - security_id: "300750.SZ"
+    name: "宁德时代"
+    type: stock
+    tags: [新能源, 自选]
+    peers: ["002594.SZ", "300014.SZ"]
+
+  - security_id: "00700.HK"
+    name: "腾讯控股"
+    type: stock
+    market: HK
+    enabled: false  # 后期扩展港股时启用
+
+funds:
+  - security_id: "110022"
+    name: "易方达消费行业"
+    type: fund
+    tags: [场外基金]
+
+  - security_id: "512690.SH"
+    name: "酒ETF"
+    type: etf
+    tags: [ETF]
