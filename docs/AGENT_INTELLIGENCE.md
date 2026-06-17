@@ -1,6 +1,8 @@
 # Agent 与智能层设计文档
 
-> 关联：[ARCHITECTURE.md](./ARCHITECTURE.md) · [FUSION_RECONCILE.md](./FUSION_RECONCILE.md)
+> 版本 v0.2.0 | 关联：[ARCHITECTURE.md](./ARCHITECTURE.md) · [FUSION_RECONCILE.md](./FUSION_RECONCILE.md)
+
+**v0.2 适用范围**：智能层（DeepSeek、ResearchAgent）主要服务于 **FocusLayer 重点股**；全市场层由 SurveillanceEngine 规则监管，不走 LLM 逐只解读（避免 5000×LLM 成本与幻觉）。
 
 ---
 

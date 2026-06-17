@@ -3,8 +3,8 @@
 | 属性 | 值 |
 |------|-----|
 | 项目名称 | DataAnalysisBase |
-| 版本 | v0.1.0 |
-| 状态 | 设计阶段 |
+| 版本 | v0.2.0 |
+| 状态 | 设计阶段（文档已完成，待实现） |
 | 目标市场 | A 股（优先）→ 港股 / 美股（扩展） |
 | LLM | DeepSeek（首期） |
 | 文档日期 | 2026-06-14 |
@@ -44,15 +44,17 @@
 
 ### 1.2 项目目标
 
-构建一套 **以单只证券 / 基金 / 上市公司为核心实体** 的 **多源融合投资研究平台**：
+构建一套 **本地 A 股全市场智能监管与分析平台**：
 
 | 目标 | 描述 |
 |------|------|
-| **多源接入** | 统一对接 AKShare、Tushare Pro 等，预留港股/美股扩展 |
-| **融合对账** | 多源数据标准化、差异检测、可配置融合策略 |
-| **本地真相库** | 融合结果落地 DuckDB，支持可复现研究 |
-| **智能分析** | DeepSeek Agent 解读数据、解释差异、生成研报（不生产数字） |
-| **实体中心** | 一切分析围绕 `Security` / `Issuer` 展开 |
+| **全市场覆盖** | 沪深京 ~5000+ 只股票定时快照与监管（见 [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md)） |
+| **本地 Web 仪表盘** | React 前端直观展示市场、行业、告警（见 [UI_DESIGN.md](./UI_DESIGN.md)） |
+| **行业分类** | 板块排行、热力图、成分股浏览 |
+| **自动化监管** | 全市场变化检测与告警流（SurveillanceEngine） |
+| **重点股深度** | 自选更高频跟踪、多源融合、对账、AI 研报（FocusLayer） |
+| **多源接入** | AKShare（全市场主）+ Tushare（重点股对账） |
+| **实体中心** | `Security` / `Issuer` 为主键，全市场与重点股共用 |
 
 ### 1.3 非目标（明确不做）
 
@@ -95,13 +97,13 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    DataAnalysisBase                      │
-│         AI-Native 多源融合投资研究助手（个人版）          │
+│      本地 A 股全市场智能监管与分析平台（个人版）          │
 ├─────────────────────────────────────────────────────────┤
-│  输入：证券代码、自然语言问题、自选股列表                  │
-│  输出：融合数据、对账报告、研究研报、事件告警              │
+│  全市场层：5000+ 股快照、行业视图、异动监管告警            │
+│  重点股层：自选深度跟踪、多源对账、AI 研报                 │
 ├─────────────────────────────────────────────────────────┤
+│  交付：本地 Web 仪表盘（主）+ CLI（高级）+ DuckDB 数据层   │
 │  用户：个人开发者 / 个人投资者                           │
-│  场景：财报研究、估值对比、新闻监控、策略回测辅助          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -114,6 +116,38 @@
 | 指标计算与回测 | 实盘交易执行 |
 | AI 研报与问答 | 保证投资收益 |
 | 事件监控与推送 | 全市场毫秒级行情 |
+| Web 仪表盘全市场浏览 | 机构级专业终端 |
+
+### 3.3 v0.2 双层架构（MarketLayer + FocusLayer）
+
+```mermaid
+graph TB
+    subgraph market [MarketLayer]
+        M1[BulkSync_30min]
+        M2[market_snapshots]
+        M3[SurveillanceEngine]
+    end
+    subgraph focus [FocusLayer]
+        F1[FocusSync_5min]
+        F2[FusionPipeline]
+        F3[ResearchAgent]
+    end
+    subgraph delivery [Delivery]
+        WEB[React_Dashboard]
+        API[FastAPI]
+    end
+    M1 --> M2 --> M3
+    F1 --> F2 --> F3
+    M2 --> API --> WEB
+    M3 --> API
+    F2 --> API
+    F3 --> API
+```
+
+| 层级 | 覆盖 | 频率 | 文档 |
+|------|------|------|------|
+| MarketLayer | 全 A 股 | 30min 快照 + 日终日 K | [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) |
+| FocusLayer | watchlist | 5min + 周/按需财务 | [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) |
 
 ---
 
@@ -845,12 +879,20 @@ DataAnalysisBase/
 
 ## 15. 相关文档
 
-- [DATA_SOURCES.md](./DATA_SOURCES.md) — 数据源详细说明
-- [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) — 融合与对账引擎
-- [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) — Agent 与 DeepSeek 设计
-- [ROADMAP.md](./ROADMAP.md) — 实施路线图
-- [examples/](./examples/) — 配置示例
+| 文档 | 说明 |
+|------|------|
+| [REQUIREMENTS.md](./REQUIREMENTS.md) | 产品需求规格（v0.2 基线） |
+| [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) | 全市场层与监管引擎 |
+| [UI_DESIGN.md](./UI_DESIGN.md) | Web 仪表盘与 API 契约 |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 设计评审、优化点与风险 |
+| [PRODUCT_OUTCOMES.md](./PRODUCT_OUTCOMES.md) | 最终实现效果 |
+| [DATA_SOURCES.md](./DATA_SOURCES.md) | 数据源说明 |
+| [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) | 重点股融合与对账 |
+| [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) | Agent 与 DeepSeek |
+| [ROADMAP.md](./ROADMAP.md) | Phase A~E 路线图 |
+| [CONFIG_REFERENCE.md](./CONFIG_REFERENCE.md) | 调度与监管配置 |
+| [examples/](./examples/) | YAML 配置示例 |
 
 ---
 
-*本文档随项目实施持续更新。*
+*本文档 v0.2.0 — 设计阶段优先，实现见 ROADMAP。*

@@ -1,38 +1,56 @@
 # DataAnalysisBase 文档索引
 
-> 多源融合 · 实体中心 · AI 辅助投资研究平台
+> 本地 A 股全市场智能监管与分析平台 · 设计 v0.2.0
+
+## 阅读顺序（推荐）
+
+```text
+1. REQUIREMENTS.md      → 要做什么
+2. ARCHITECTURE.md      → 总体怎么搭
+3. MARKET_SURVEILLANCE → 全市场 + 监管
+4. UI_DESIGN.md         → 仪表盘长什么样
+5. DESIGN_REVIEW.md     → 设计是否能达成目标
+6. INTELLIGENCE_ROADMAP → 怎么更智能、更完善
+7. PRODUCT_OUTCOMES.md  → 做完能看到什么
+8. ROADMAP.md           → 实现顺序
+```
 
 ## 文档列表
 
 | 文档 | 说明 |
 |------|------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | **主架构设计文档**（系统全貌、分层设计、数据模型、接口契约） |
-| [DATA_SOURCES.md](./DATA_SOURCES.md) | 数据源说明（AKShare / Tushare / 扩展源） |
-| [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) | 多源融合与对账引擎设计 |
-| [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) | Agent 与 DeepSeek 智能层设计 |
-| [ROADMAP.md](./ROADMAP.md) | 分阶段实施路线图与验收标准 |
-| [PRODUCT_OUTCOMES.md](./PRODUCT_OUTCOMES.md) | **最终实现效果**：用户可见结果与日常使用方式 |
+| [REQUIREMENTS.md](./REQUIREMENTS.md) | **产品需求规格（PRD）** v0.2 |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | **主架构设计**（双层架构、分层、存储） |
+| [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) | 全市场层、行业、监管引擎、调度 |
+| [UI_DESIGN.md](./UI_DESIGN.md) | React 仪表盘六页、REST/WebSocket API |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 当前设计评审、优化点与剩余风险 |
+| [INTELLIGENCE_ROADMAP.md](./INTELLIGENCE_ROADMAP.md) | 智能化与扩展路线（自适应异常、事件叙事、NL 查询、持仓、正确性陷阱） |
+| [PRODUCT_OUTCOMES.md](./PRODUCT_OUTCOMES.md) | 最终实现效果与用户场景 |
+| [DATA_SOURCES.md](./DATA_SOURCES.md) | AKShare / Tushare 数据源 |
+| [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) | 重点股多源融合与对账 |
+| [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) | DeepSeek Agent 设计 |
+| [ROADMAP.md](./ROADMAP.md) | 设计阶段 + Phase A~E 路线图 |
+| [CONFIG_REFERENCE.md](./CONFIG_REFERENCE.md) | 同步调度与监管规则配置 |
 
 ## 配置示例
 
 | 文件 | 说明 |
 |------|------|
-| [examples/fusion_policy.yaml](./examples/fusion_policy.yaml) | 融合策略配置 |
-| [examples/reconcile_thresholds.yaml](./examples/reconcile_thresholds.yaml) | 对账阈值配置 |
-| [examples/watchlist.yaml](./examples/watchlist.yaml) | 自选股表示例 |
-| [examples/providers.yaml](./examples/providers.yaml) | 数据源启用与优先级 |
+| [examples/fusion_policy.yaml](./examples/fusion_policy.yaml) | 融合策略（重点股） |
+| [examples/reconcile_thresholds.yaml](./examples/reconcile_thresholds.yaml) | 对账阈值 |
+| [examples/watchlist.yaml](./examples/watchlist.yaml) | 重点股自选 |
+| [examples/providers.yaml](./examples/providers.yaml) | 数据源启用 |
 
-## 快速阅读路径
+调度与监管配置见 [CONFIG_REFERENCE.md](./CONFIG_REFERENCE.md)（实现时复制到 `config/`）。
 
-1. 先读 [ARCHITECTURE.md](./ARCHITECTURE.md) 第一～四章，了解定位与总体架构
-2. 读 [DATA_SOURCES.md](./DATA_SOURCES.md) 理解多源边界
-3. 读 [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) 理解平台核心差异化
-4. 读 [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) 理解 AI 如何接入
-5. 读 [ROADMAP.md](./ROADMAP.md) 确定实施顺序
-6. 读 [PRODUCT_OUTCOMES.md](./PRODUCT_OUTCOMES.md) 了解做完后能看到什么
-
-## 版本
+## 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| v0.1.0 | 2026-06-14 | 初始架构设计 |
+| v0.1.0 | 2026-06-14 | 多源融合 + CLI 研究助手 |
+| v0.2.0 | 2026-06-14 | 全 A 股监管 + Web 仪表盘 + 双层架构 |
+| v0.2.2 | 2026-06-17 | 智能化路线：自适应异常、事件叙事、NL 查询、持仓、正确性陷阱 |
+
+## 当前状态
+
+**设计文档阶段已完成，尚未开始编码。** 实现从 [ROADMAP.md](./ROADMAP.md) Phase A 启动。
