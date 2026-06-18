@@ -554,7 +554,7 @@ Phase F: surveillance(异常/聚类), intelligence(叙事/综述/NL), portfolio
 | 可观测内建 | 同步/规则/LLM 调用均埋点到 observability |
 | 配置外置 | 阈值/规则/调度走 config，不硬编码 |
 
-> 以上为**架构级**约定。**代码风格**（命名/格式/类型/docstring/工具链）与**工程范式**（错误处理/日志/测试/async/纯函数边界）见 [CODING_STANDARDS.md](./CODING_STANDARDS.md)，编码期强制对照。
+> 以上为**架构级**约定。**代码风格**（命名/格式/类型/docstring/工具链）与**工程范式**（错误处理/日志/测试/async/纯函数边界）见 [CODING_STANDARDS.md](./CODING_STANDARDS.md)，编码期强制对照。跨模块**接口对接**（共享 DTO、调用矩阵、各模块暴露签名）见 [MODULE_INTERFACES.md](./MODULE_INTERFACES.md)。
 
 ---
 
