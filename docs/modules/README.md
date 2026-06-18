@@ -17,9 +17,9 @@
 | Phase B/A | observability | [07-observability.md](./07-observability.md) | ✅ |
 | Phase A+ | api | [08-api.md](./08-api.md) | ✅ |
 | Phase A+ | frontend | [09-frontend.md](./09-frontend.md) | ✅ |
-| Phase C/E | analytics | 10-analytics.md | 待拆 |
-| Phase D | fusion | 11-fusion.md | 待拆 |
-| Phase D/F | intelligence | 12-intelligence.md | 待拆 |
+| Phase C/E | analytics | [10-analytics.md](./10-analytics.md) | ✅ |
+| Phase D | fusion | [11-fusion.md](./11-fusion.md) | ✅ |
+| Phase D/F | intelligence | [12-intelligence.md](./12-intelligence.md) | ✅ |
 | Phase F | portfolio | 13-portfolio.md | 待拆 |
 | Phase A/E | delivery | 14-delivery.md | 待拆 |
 
