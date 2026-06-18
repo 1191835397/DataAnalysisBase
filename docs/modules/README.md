@@ -20,8 +20,8 @@
 | Phase C/E | analytics | [10-analytics.md](./10-analytics.md) | ✅ |
 | Phase D | fusion | [11-fusion.md](./11-fusion.md) | ✅ |
 | Phase D/F | intelligence | [12-intelligence.md](./12-intelligence.md) | ✅ |
-| Phase F | portfolio | 13-portfolio.md | 待拆 |
-| Phase A/E | delivery | 14-delivery.md | 待拆 |
+| Phase F | portfolio | [13-portfolio.md](./13-portfolio.md) | ✅ |
+| Phase A/E | delivery | [14-delivery.md](./14-delivery.md) | ✅ |
 
 ## 每篇文档的统一结构
 
@@ -39,4 +39,4 @@
 
 ## 阅读建议
 
-先读 [MODULE_DESIGN.md](../MODULE_DESIGN.md) 建立全局模块边界，再按 Phase A 主线依次读 `01`→`05`，即为第一批编码顺序。
+先读 [MODULE_DESIGN.md](../MODULE_DESIGN.md) 建立全局模块边界，再按 Phase A 主线依次读 `01`→`05`，即为第一批编码顺序。全部 14 个模块详细设计已完成（`01`→`14`），可按 Phase 顺序进入实现阶段。
