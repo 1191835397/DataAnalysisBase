@@ -13,8 +13,8 @@
 | Phase A | storage | [03-storage.md](./03-storage.md) | ✅ |
 | Phase A | providers | [04-providers.md](./04-providers.md) | ✅ |
 | Phase A | ingest | [05-ingest.md](./05-ingest.md) | ✅ |
-| Phase B | surveillance | 06-surveillance.md | 待拆 |
-| Phase B/A | observability | 07-observability.md | 待拆 |
+| Phase B | surveillance | [06-surveillance.md](./06-surveillance.md) | ✅ |
+| Phase B/A | observability | [07-observability.md](./07-observability.md) | ✅ |
 | Phase A+ | api | 08-api.md | 待拆 |
 | Phase A+ | frontend | 09-frontend.md | 待拆 |
 | Phase C/E | analytics | 10-analytics.md | 待拆 |
