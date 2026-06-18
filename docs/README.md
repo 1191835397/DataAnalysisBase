@@ -22,7 +22,8 @@
 |------|------|
 | [REQUIREMENTS.md](./REQUIREMENTS.md) | **产品需求规格（PRD）** v0.2 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | **主架构设计**（双层架构、分层、存储） |
-| [MODULE_DESIGN.md](./MODULE_DESIGN.md) | **单模块详细设计**（职责、接口、依赖、Phase 对照） |
+| [MODULE_DESIGN.md](./MODULE_DESIGN.md) | **模块总览与边界**（14 模块、依赖图、Phase 对照） |
+| [modules/](./modules/README.md) | **单模块详细设计**（可编码级：类、方法、状态机、DDL、测试） |
 | [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) | 全市场层、行业、监管引擎、调度 |
 | [UI_DESIGN.md](./UI_DESIGN.md) | React 仪表盘六页、REST/WebSocket API |
 | [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 当前设计评审、优化点与剩余风险 |
