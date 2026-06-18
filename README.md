@@ -18,6 +18,7 @@
 | [docs/README.md](docs/README.md) | 文档索引与阅读顺序 |
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 产品需求 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构 |
+| [docs/MODULE_DESIGN.md](docs/MODULE_DESIGN.md) | 单模块详细设计 |
 | [docs/MARKET_SURVEILLANCE.md](docs/MARKET_SURVEILLANCE.md) | 全市场 + 监管 |
 | [docs/UI_DESIGN.md](docs/UI_DESIGN.md) | Web 仪表盘设计 |
 | [docs/DESIGN_REVIEW.md](docs/DESIGN_REVIEW.md) | 设计评审与优化建议 |

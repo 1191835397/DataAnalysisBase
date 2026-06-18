@@ -11,8 +11,9 @@
 4. UI_DESIGN.md         → 仪表盘长什么样
 5. DESIGN_REVIEW.md     → 设计是否能达成目标
 6. INTELLIGENCE_ROADMAP → 怎么更智能、更完善
-7. PRODUCT_OUTCOMES.md  → 做完能看到什么
-8. ROADMAP.md           → 实现顺序
+7. MODULE_DESIGN.md     → 各模块怎么拆、怎么实现
+8. PRODUCT_OUTCOMES.md  → 做完能看到什么
+9. ROADMAP.md           → 实现顺序
 ```
 
 ## 文档列表
@@ -21,6 +22,7 @@
 |------|------|
 | [REQUIREMENTS.md](./REQUIREMENTS.md) | **产品需求规格（PRD）** v0.2 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | **主架构设计**（双层架构、分层、存储） |
+| [MODULE_DESIGN.md](./MODULE_DESIGN.md) | **单模块详细设计**（职责、接口、依赖、Phase 对照） |
 | [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) | 全市场层、行业、监管引擎、调度 |
 | [UI_DESIGN.md](./UI_DESIGN.md) | React 仪表盘六页、REST/WebSocket API |
 | [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 当前设计评审、优化点与剩余风险 |
