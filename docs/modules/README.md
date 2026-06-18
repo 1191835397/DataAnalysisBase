@@ -15,8 +15,8 @@
 | Phase A | ingest | [05-ingest.md](./05-ingest.md) | ✅ |
 | Phase B | surveillance | [06-surveillance.md](./06-surveillance.md) | ✅ |
 | Phase B/A | observability | [07-observability.md](./07-observability.md) | ✅ |
-| Phase A+ | api | 08-api.md | 待拆 |
-| Phase A+ | frontend | 09-frontend.md | 待拆 |
+| Phase A+ | api | [08-api.md](./08-api.md) | ✅ |
+| Phase A+ | frontend | [09-frontend.md](./09-frontend.md) | ✅ |
 | Phase C/E | analytics | 10-analytics.md | 待拆 |
 | Phase D | fusion | 11-fusion.md | 待拆 |
 | Phase D/F | intelligence | 12-intelligence.md | 待拆 |
