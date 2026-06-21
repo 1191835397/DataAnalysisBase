@@ -4,6 +4,8 @@
 
 本目录把 [MODULE_DESIGN.md](../MODULE_DESIGN.md) 的每个模块拆成**可直接编码的详细设计**：完整类结构、方法签名、状态机/时序、表 DDL、错误处理、测试用例清单。
 
+进入实现阶段后，模块还需要补齐“交付文档包”，规则见 [../MODULE_DELIVERY_STANDARD.md](../MODULE_DELIVERY_STANDARD.md)，模板见 [../MODULE_DELIVERY_TEMPLATE.md](../MODULE_DELIVERY_TEMPLATE.md)。
+
 ## 拆分进度（按 Phase 批次）
 
 | 批次 | 模块 | 文档 | 状态 |
@@ -22,6 +24,27 @@
 | Phase D/F | intelligence | [12-intelligence.md](./12-intelligence.md) | ✅ |
 | Phase F | portfolio | [13-portfolio.md](./13-portfolio.md) | ✅ |
 | Phase A/E | delivery | [14-delivery.md](./14-delivery.md) | ✅ |
+
+## 模块交付文档包
+
+进入编码阶段的模块，除设计文档外，还应同步维护：
+
+- `*-implementation.md`
+- `*-verification.md`
+- `*-operations.md`
+
+Phase A 首批已初始化如下：
+
+| 模块 | 设计 | 实施记录 | 验证记录 | 使用说明 |
+|------|------|----------|----------|----------|
+| domain | [01-domain.md](./01-domain.md) | [01-domain-implementation.md](./01-domain-implementation.md) | [01-domain-verification.md](./01-domain-verification.md) | [01-domain-operations.md](./01-domain-operations.md) |
+| config | [02-config.md](./02-config.md) | [02-config-implementation.md](./02-config-implementation.md) | [02-config-verification.md](./02-config-verification.md) | [02-config-operations.md](./02-config-operations.md) |
+| storage | [03-storage.md](./03-storage.md) | [03-storage-implementation.md](./03-storage-implementation.md) | [03-storage-verification.md](./03-storage-verification.md) | [03-storage-operations.md](./03-storage-operations.md) |
+| providers | [04-providers.md](./04-providers.md) | [04-providers-implementation.md](./04-providers-implementation.md) | [04-providers-verification.md](./04-providers-verification.md) | [04-providers-operations.md](./04-providers-operations.md) |
+| ingest | [05-ingest.md](./05-ingest.md) | [05-ingest-implementation.md](./05-ingest-implementation.md) | [05-ingest-verification.md](./05-ingest-verification.md) | [05-ingest-operations.md](./05-ingest-operations.md) |
+| observability | [07-observability.md](./07-observability.md) | [07-observability-implementation.md](./07-observability-implementation.md) | [07-observability-verification.md](./07-observability-verification.md) | [07-observability-operations.md](./07-observability-operations.md) |
+| api | [08-api.md](./08-api.md) | [08-api-implementation.md](./08-api-implementation.md) | [08-api-verification.md](./08-api-verification.md) | [08-api-operations.md](./08-api-operations.md) |
+| frontend | [09-frontend.md](./09-frontend.md) | [09-frontend-implementation.md](./09-frontend-implementation.md) | [09-frontend-verification.md](./09-frontend-verification.md) | [09-frontend-operations.md](./09-frontend-operations.md) |
 
 ## 每篇文档的统一结构
 

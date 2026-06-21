@@ -27,6 +27,9 @@
 | [modules/](./modules/README.md) | **单模块详细设计**（可编码级：类、方法、状态机、DDL、测试） |
 | [MODULE_INTERFACES.md](./MODULE_INTERFACES.md) | **模块接口对接矩阵**（共享 DTO、调用矩阵、暴露签名、错误契约） |
 | [CODING_STANDARDS.md](./CODING_STANDARDS.md) | **编码规范与工程原则**（代码风格 + 设计范式，编码期强制） |
+| [MODULE_DELIVERY_STANDARD.md](./MODULE_DELIVERY_STANDARD.md) | **模块交付标准**（设计、实现、验证、说明的统一要求） |
+| [MODULE_DELIVERY_TEMPLATE.md](./MODULE_DELIVERY_TEMPLATE.md) | **模块交付模板**（实施记录、验证记录、使用说明模板） |
+| [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) | **实施摘要**（编码前准备、Phase A 闭环、硬约束与先统一项） |
 | [MARKET_SURVEILLANCE.md](./MARKET_SURVEILLANCE.md) | 全市场层、行业、监管引擎、调度 |
 | [UI_DESIGN.md](./UI_DESIGN.md) | React 仪表盘六页、REST/WebSocket API |
 | [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 当前设计评审、优化点与剩余风险 |
