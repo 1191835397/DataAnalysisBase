@@ -3,10 +3,10 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `config` |
-| 状态 | `in_progress` |
+| 状态 | `implemented` |
 | Phase | `A` |
 | 负责人 | `TBD` |
-| 最近更新 | `2026-06-23` |
+| 最近更新 | `2026-06-24` |
 | 关联设计 | [02-config.md](./02-config.md) |
 
 ## 1. 当前目标
@@ -47,14 +47,17 @@
 - 已落地 `providers.yaml`、`sync_schedule.yaml`、`surveillance_rules.yaml`
 - 已落地 `watchlist.yaml`、`fusion_policy.yaml`、`reconcile_thresholds.yaml`
 - 已新增 `.env.example`
+- 已实现 `Settings`、Providers、SyncSchedule、SurveillanceRules、Watchlist、FusionPolicy、ReconcileThresholds 配置模型
+- 已实现 `load_*` 系列加载器
+- 已补 `backend/tests/config_loader/test_loader.py`
 
 ### 进行中
 
-- 等待实现 `config_loader` 的 Pydantic 加载与校验
+- 等待 Python 3.11 与依赖环境后运行 pytest
 
 ### 未开始
 
-- Python 配置加载器
+- Phase F 配置热加载
 
 ## 6. 关键决策
 
@@ -65,7 +68,7 @@
 
 ## 7. 与原设计偏差
 
-当前无实现，暂无偏差。
+当前无偏差。实现额外覆盖了 `fusion_policy.yaml` 与 `reconcile_thresholds.yaml`，方便后续 Phase D 复用同一加载器。
 
 ## 8. 代码位置
 
@@ -76,10 +79,11 @@
 
 ## 9. 风险与阻塞
 
+- 当前机器缺少 Python 3.11 和项目依赖，完整 pytest 尚未执行
 - 配置字段如果与文档命名不一致，会影响多个模块同时对接
 
 ## 10. 下一步动作
 
-1. 定义配置模型
-2. 实现 `load_*` 加载器
-3. 补非法配置与默认值测试
+1. 安装或切换到 Python 3.11
+2. 安装后端开发依赖
+3. 运行 `pytest backend/tests/config_loader`
