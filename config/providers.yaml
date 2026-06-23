@@ -1,0 +1,47 @@
+# 数据源 Provider 配置
+
+version: "1.0"
+
+providers:
+  akshare:
+    enabled: true
+    priority: 2
+    rate_limit:
+      requests_per_minute: 30
+      retry: 3
+      retry_delay_sec: 2
+    datasets:
+      - market_spot
+      - daily_bars
+      - valuation
+      - financials
+      - money_flow
+      - news
+      - fund_nav
+
+  tushare:
+    enabled: false
+    priority: 1
+    token_env: TUSHARE_TOKEN
+    rate_limit:
+      requests_per_minute: 200
+    datasets:
+      - daily_bars
+      - valuation
+      - financials
+      - money_flow
+      - index
+      - macro
+
+  cninfo:
+    enabled: false
+    priority: 1
+    datasets:
+      - announcements
+
+  yfinance:
+    enabled: false
+    priority: 2
+    datasets:
+      - daily_bars
+      - valuation

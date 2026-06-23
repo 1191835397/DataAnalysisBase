@@ -3,10 +3,10 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `api` |
-| 状态 | `planned` |
+| 状态 | `in_progress` |
 | Phase | `A+` |
 | 负责人 | `TBD` |
-| 最近更新 | `2026-06-22` |
+| 最近更新 | `2026-06-23` |
 | 关联设计 | [08-api.md](./08-api.md) |
 
 ## 1. 当前目标
@@ -47,14 +47,17 @@
 ### 已完成
 
 - API 详细设计已完成
+- 已初始化 `backend/src/dataanalysisbase/api/`
+- 已提供最小 `FastAPI` 应用入口
+- 已提供 `/health` 与 `/api/v1/health`
 
 ### 进行中
 
-- 无
+- 等待 Python 3.11 与依赖环境后运行 FastAPI/TestClient 验证
 
 ### 未开始
 
-- 路由实现
+- Phase A 业务路由实现
 - 错误处理器
 - 契约测试
 
@@ -80,6 +83,6 @@
 
 ## 10. 下一步动作
 
-1. 建 FastAPI 应用骨架
-2. 先打通 `GET /market/overview`
-3. 再补 `stocks`、`industries`、`system/status`
+1. 安装或切换到 Python 3.11
+2. 先验证 `/api/v1/health`
+3. 再补 `market`、`stocks`、`industries`、`system/status`

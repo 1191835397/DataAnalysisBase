@@ -3,10 +3,10 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `config` |
-| 状态 | `planned` |
+| 状态 | `in_progress` |
 | Phase | `A` |
 | 负责人 | `TBD` |
-| 最近更新 | `2026-06-22` |
+| 最近更新 | `2026-06-23` |
 | 关联设计 | [02-config.md](./02-config.md) |
 
 ## 1. 当前目标
@@ -43,15 +43,18 @@
 ### 已完成
 
 - 配置参考文档与样例已存在
+- 已初始化运行期 `config/` 目录
+- 已落地 `providers.yaml`、`sync_schedule.yaml`、`surveillance_rules.yaml`
+- 已落地 `watchlist.yaml`、`fusion_policy.yaml`、`reconcile_thresholds.yaml`
+- 已新增 `.env.example`
 
 ### 进行中
 
-- 无
+- 等待实现 `config_loader` 的 Pydantic 加载与校验
 
 ### 未开始
 
 - Python 配置加载器
-- 配置模板复制到运行目录
 
 ## 6. 关键决策
 
@@ -69,6 +72,7 @@
 - `backend/src/dataanalysisbase/config_loader/`
 - `backend/tests/config_loader/`
 - `config/`
+- `.env.example`
 
 ## 9. 风险与阻塞
 
@@ -76,6 +80,6 @@
 
 ## 10. 下一步动作
 
-1. 复制 `docs/examples/*.yaml` 到运行期模板
-2. 定义配置模型
-3. 实现加载器并补校验测试
+1. 定义配置模型
+2. 实现 `load_*` 加载器
+3. 补非法配置与默认值测试

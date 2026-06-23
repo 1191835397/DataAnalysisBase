@@ -1,0 +1,30 @@
+version: "1.0"
+timezone: "Asia/Shanghai"
+
+jobs:
+  market_bulk_snapshot:
+    description: 全 A 股批量现货快照
+    interval_minutes: 30
+    trading_sessions:
+      - start: "09:30"
+        end: "11:30"
+      - start: "13:00"
+        end: "15:00"
+    trading_days_only: true
+    on_complete: surveillance_eval
+
+  focus_deep_sync:
+    description: 重点股深度同步
+    interval_minutes: 5
+    trading_sessions:
+      - start: "09:30"
+        end: "11:30"
+      - start: "13:00"
+        end: "15:00"
+    trading_days_only: true
+
+  eod_daily_bars:
+    cron: "35 15 * * 1-5"
+
+  eod_master_data:
+    cron: "40 15 * * 1-5"

@@ -62,4 +62,4 @@
 
 ## 当前状态
 
-**设计文档阶段已完成，尚未开始编码。** 实现从 [ROADMAP.md](./ROADMAP.md) Phase A 启动。
+**设计文档阶段已完成，Phase A 工程骨架已开始。** 实现从 [ROADMAP.md](./ROADMAP.md) Phase A 启动。
