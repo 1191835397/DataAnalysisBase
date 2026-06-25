@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
 from dataanalysisbase.delivery.plan import build_sync_market_plan
+from dataanalysisbase.delivery.sync import run_market_sync
 from dataanalysisbase.observability.system_status import (
     build_runtime_status,
     has_errors,
@@ -32,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
         return _status(args)
     if args.command == "plan" and args.plan_command == "sync-market":
         return _plan_sync_market(args)
+    if args.command == "sync" and args.sync_command == "market":
+        return _sync_market(args)
 
     parser.print_help()
     return 2
@@ -61,6 +65,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     plan_sync_market.add_argument("--config-dir", type=Path, default=None)
     plan_sync_market.add_argument("--json", action="store_true", dest="json_output")
+
+    sync_parser = subparsers.add_parser("sync", help="Run manual sync jobs")
+    sync_subparsers = sync_parser.add_subparsers(dest="sync_command")
+    sync_market = sync_subparsers.add_parser("market", help="Run one whole-market sync")
+    sync_market.add_argument("--config-dir", type=Path, default=None)
+    sync_market.add_argument("--snapshot-time", type=_parse_datetime, default=None)
+    sync_market.add_argument("--execute", action="store_true")
+    sync_market.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -106,6 +118,34 @@ def _plan_sync_market(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sync_market(args: argparse.Namespace) -> int:
+    if not args.execute:
+        plan = build_sync_market_plan(args.config_dir)
+        if args.json_output:
+            print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        else:
+            print("dry-run: true")
+            print("pass --execute to call provider and write DuckDB")
+            print(f"provider: {plan.selected_provider.name}")
+            print(f"target_tables: {', '.join(plan.target_tables)}")
+        return 0
+
+    snapshot_time = args.snapshot_time or datetime.now().astimezone()
+    result = run_market_sync(snapshot_time, config_dir=args.config_dir)
+    if args.json_output:
+        print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"task: {result.task}")
+        print(f"status: {result.status.value}")
+        print(f"snapshot_time: {result.snapshot_time}")
+        print(f"expected: {result.expected}")
+        print(f"actual: {result.actual}")
+        print(f"missing: {result.missing}")
+        for error in result.errors:
+            print(f"error: {error}")
+    return 1 if result.status.value == "failed" else 0
+
+
 def _emit(results: Sequence[BaseModel], *, json_output: bool) -> None:
     if json_output:
         payload: list[dict[str, Any]] = [result.model_dump(mode="json") for result in results]
@@ -115,6 +155,14 @@ def _emit(results: Sequence[BaseModel], *, json_output: bool) -> None:
     for result in results:
         data = result.model_dump()
         print(f"{data['status'].upper():7} {data['name']}: {data['message']}")
+
+
+def _parse_datetime(raw: str) -> datetime:
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError as exc:
+        msg = f"Invalid datetime: {raw}"
+        raise argparse.ArgumentTypeError(msg) from exc
 
 
 if __name__ == "__main__":

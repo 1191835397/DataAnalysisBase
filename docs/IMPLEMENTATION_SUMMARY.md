@@ -223,6 +223,7 @@ config/
 - `dab doctor`
 - `dab status --json`
 - `dab plan sync-market`
+- `dab sync market`（默认 dry-run，显式 `--execute` 才会真实调用 provider 并写 DuckDB）
 - `/api/v1/system/status`
 - mock provider 同步测试
 

@@ -46,11 +46,13 @@
 - 数据源设计与字段映射文档已完成
 - `MarketDataProvider` / `MarketSnapshotBatch` 合约已完成
 - `AkshareAdapter.fetch_market_snapshot()` 最小现货快照映射已完成
+- `ProviderRegistry` 已按 `providers.yaml` 的启用状态、数据集和优先级路由 `market_spot`
 - `MarketBulkSync` 已可消费 provider batch 并刷新聚合表
+- `dab sync market` 已提供默认 dry-run 与显式 `--execute` 手动执行入口
 
 ### 进行中
 
-- ProviderRegistry 路由与健康检查
+- Provider 健康检查
 
 ### 未开始
 
@@ -80,6 +82,6 @@
 
 ## 10. 下一步动作
 
-1. 实现 ProviderRegistry 路由
-2. 补健康检查与限流策略
-3. 在可联网环境手动验证 AKShare 全市场快照
+1. 补健康检查与限流策略
+2. 在可联网环境手动验证 AKShare 全市场快照
+3. 接 API / 前端读取真实快照聚合结果

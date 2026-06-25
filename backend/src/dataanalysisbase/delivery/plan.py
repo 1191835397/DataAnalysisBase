@@ -8,8 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from dataanalysisbase.common.errors import ConfigError
 from dataanalysisbase.config_loader import load_providers, load_settings, load_sync_schedule
-from dataanalysisbase.config_loader.providers_cfg import ProviderEntry
-from dataanalysisbase.domain.enums import DatasetType
+from dataanalysisbase.providers import ProviderRegistry
 
 SYNC_MARKET_TABLES = [
     "market_snapshot_runs",
@@ -61,7 +60,7 @@ def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
     resolved_config_dir = config_dir or settings.config_dir
     providers = load_providers(resolved_config_dir)
     schedule = load_sync_schedule(resolved_config_dir)
-    provider_name, provider = _select_market_provider(providers.providers)
+    provider_name, provider = ProviderRegistry(providers).market_snapshot_provider_config()
     job = schedule.jobs.get("market_bulk_snapshot")
     if job is None:
         raise ConfigError("sync_schedule.yaml missing job: market_bulk_snapshot")
@@ -93,14 +92,3 @@ def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
             "real execution should write through MarketBulkSync and storage repositories",
         ],
     )
-
-
-def _select_market_provider(providers: dict[str, ProviderEntry]) -> tuple[str, ProviderEntry]:
-    candidates = [
-        (name, provider)
-        for name, provider in providers.items()
-        if provider.enabled and DatasetType.MARKET_SPOT in provider.datasets
-    ]
-    if not candidates:
-        raise ConfigError("No enabled provider supports market_spot")
-    return min(candidates, key=lambda item: item[1].priority)

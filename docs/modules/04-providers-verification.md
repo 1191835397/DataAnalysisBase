@@ -26,7 +26,8 @@
 | `AkshareAdapter.fetch_market_snapshot()` 成功 | 单元测试 | `passed` | Fake DataFrame-like 输入，不联网 |
 | DataFrame 正确映射为 `MarketSnapshotBatch` / `MarketRow` | 单元测试 | `passed` | 覆盖代码、名称、价格、涨跌幅、量比、估值、行业 |
 | 单源异常被包装为 `ProviderError` | 单元测试 | `passed` | 覆盖 fetcher 异常 |
-| `ProviderRegistry` 路由正确 | 单元测试 | `not_started` |  |
+| `ProviderRegistry` 路由正确 | 单元测试 | `passed` | 覆盖优先级、禁用 provider、未知 provider |
+| `dab sync market` 默认 dry-run | 单元测试 | `passed` | 不调用 provider，不写 DuckDB |
 
 ## 4. 边界场景
 
@@ -38,7 +39,7 @@
 ## 5. 已知问题
 
 - 尚未进行真实 AKShare 联网手动验证
-- `ProviderRegistry`、限流与健康检查尚未实现
+- 限流与健康检查尚未实现
 
 ## 6. 剩余风险
 
@@ -46,4 +47,4 @@
 
 ## 7. 验收结论
 
-当前达到最小 adapter 单元验证标准；Phase A 完整交付仍需完成 registry、健康检查、限流与真实联网手动验证。
+当前达到最小 adapter、registry 和手动同步入口单元验证标准；Phase A 完整交付仍需完成健康检查、限流与真实联网手动验证。
