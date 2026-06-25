@@ -224,7 +224,7 @@ config/
 - `dab status --json`
 - `dab plan sync-market`
 - `dab sync market`（默认 dry-run，显式 `--execute` 才会真实调用 provider 并写 DuckDB）
-- `/api/v1/system/status`
+- `/api/v1/system/status`（包含 provider 本地健康状态）
 - mock provider 同步测试
 
 这些命令和接口只做本地配置、状态、数据新鲜度诊断，不安装或接管任何外部 harness 生态。

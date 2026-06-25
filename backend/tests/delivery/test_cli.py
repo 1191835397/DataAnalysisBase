@@ -15,6 +15,7 @@ def test_status_json_outputs_machine_readable_payload(capsys) -> None:
     assert exit_code == 0
     assert payload["service"] == "dataanalysisbase"
     assert "data_status" in payload
+    assert "providers" in payload
 
 
 def test_config_validate_json_succeeds(capsys) -> None:
@@ -25,3 +26,13 @@ def test_config_validate_json_succeeds(capsys) -> None:
 
     assert exit_code == 0
     assert any(item["name"] == "providers.yaml" and item["status"] == "ok" for item in payload)
+
+
+def test_doctor_json_includes_provider_health(capsys) -> None:
+    exit_code = main(["doctor", "--json"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code in {0, 1}
+    assert any(item["name"] == "provider:akshare" for item in payload)

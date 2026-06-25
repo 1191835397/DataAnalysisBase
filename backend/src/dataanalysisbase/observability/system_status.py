@@ -20,6 +20,11 @@ from dataanalysisbase.config_loader.loader import (
 )
 from dataanalysisbase.config_loader.settings import Settings
 from dataanalysisbase.domain.enums import DataStatus
+from dataanalysisbase.observability.provider_health import (
+    ProviderHealth,
+    build_provider_health,
+    provider_config_error,
+)
 from dataanalysisbase.storage import DuckDBStore, SnapshotRepo
 
 CONFIG_LOADERS = {
@@ -54,6 +59,7 @@ class RuntimeStatus(BaseModel):
     latest_snapshot_time: datetime | None = None
     duckdb_path: str
     config_dir: str
+    providers: list[ProviderHealth]
 
 
 def validate_config(config_dir: Path | None = None) -> list[CheckResult]:
@@ -85,6 +91,7 @@ def run_doctor(settings: Settings | None = None) -> list[CheckResult]:
     results.extend(validate_config(settings.config_dir))
     results.append(_secret_presence_check("DAB_TUSHARE_TOKEN", settings.tushare_token))
     results.append(_secret_presence_check("DAB_DEEPSEEK_API_KEY", settings.deepseek_api_key))
+    results.extend(_provider_checks(settings.config_dir))
     results.append(_duckdb_check(settings.duckdb_path))
     return results
 
@@ -94,6 +101,7 @@ def build_runtime_status(settings: Settings | None = None) -> RuntimeStatus:
 
     settings = settings or load_settings()
     latest_snapshot_time = _latest_snapshot_time(settings.duckdb_path)
+    providers = _provider_health(settings.config_dir)
     return RuntimeStatus(
         generated_at=datetime.now(UTC),
         run_mode=settings.run_mode,
@@ -101,6 +109,7 @@ def build_runtime_status(settings: Settings | None = None) -> RuntimeStatus:
         latest_snapshot_time=latest_snapshot_time,
         duckdb_path=str(settings.duckdb_path),
         config_dir=str(settings.config_dir),
+        providers=providers,
     )
 
 
@@ -145,6 +154,30 @@ def _duckdb_check(path: Path) -> CheckResult:
     except StorageError as exc:
         return CheckResult(name="duckdb", status="error", message=_single_line(str(exc)))
     return CheckResult(name="duckdb", status="ok", message=str(path))
+
+
+def _provider_checks(config_dir: Path) -> list[CheckResult]:
+    try:
+        providers = _provider_health(config_dir)
+    except ConfigError as exc:
+        return [CheckResult(name="provider_health", status="error", message=_single_line(str(exc)))]
+    return [
+        CheckResult(
+            name=f"provider:{provider.name}",
+            status=provider.status,
+            message=provider.message,
+        )
+        for provider in providers
+        if provider.enabled
+    ]
+
+
+def _provider_health(config_dir: Path) -> list[ProviderHealth]:
+    try:
+        providers = load_providers(config_dir)
+    except ConfigError as exc:
+        return [provider_config_error(_single_line(str(exc)))]
+    return build_provider_health(providers)
 
 
 def _latest_snapshot_time(path: Path) -> datetime | None:

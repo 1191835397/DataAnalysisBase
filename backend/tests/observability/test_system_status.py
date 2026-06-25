@@ -40,6 +40,7 @@ def test_doctor_reports_secret_presence_without_leaking_values(tmp_path: Path) -
         result.name == "DAB_DEEPSEEK_API_KEY" and result.message == "configured"
         for result in results
     )
+    assert any(result.name == "provider:akshare" for result in results)
 
 
 def test_runtime_status_is_offline_when_database_is_missing(tmp_path: Path) -> None:
@@ -53,3 +54,4 @@ def test_runtime_status_is_offline_when_database_is_missing(tmp_path: Path) -> N
 
     assert status.data_status == DataStatus.OFFLINE
     assert status.latest_snapshot_time is None
+    assert any(provider.name == "akshare" for provider in status.providers)
