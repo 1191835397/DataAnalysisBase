@@ -222,6 +222,8 @@ config/
 - `dab config validate`
 - `dab doctor`
 - `dab status --json`
+- `dab plan sync-market`
 - `/api/v1/system/status`
+- mock provider 同步测试
 
 这些命令和接口只做本地配置、状态、数据新鲜度诊断，不安装或接管任何外部 harness 生态。

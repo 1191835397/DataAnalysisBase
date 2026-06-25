@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from dataanalysisbase.delivery.plan import build_sync_market_plan
 from dataanalysisbase.observability.system_status import (
     build_runtime_status,
     has_errors,
@@ -29,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
         return _doctor(args)
     if args.command == "status":
         return _status(args)
+    if args.command == "plan" and args.plan_command == "sync-market":
+        return _plan_sync_market(args)
 
     parser.print_help()
     return 2
@@ -49,6 +52,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     status = subparsers.add_parser("status", help="Print runtime status")
     status.add_argument("--json", action="store_true", dest="json_output")
+
+    plan_parser = subparsers.add_parser("plan", help="Preview operational actions")
+    plan_subparsers = plan_parser.add_subparsers(dest="plan_command")
+    plan_sync_market = plan_subparsers.add_parser(
+        "sync-market",
+        help="Preview whole-market snapshot sync",
+    )
+    plan_sync_market.add_argument("--config-dir", type=Path, default=None)
+    plan_sync_market.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -75,6 +87,22 @@ def _status(args: argparse.Namespace) -> int:
         print(f"latest_snapshot_time: {status.latest_snapshot_time or 'none'}")
         print(f"duckdb_path: {status.duckdb_path}")
         print(f"config_dir: {status.config_dir}")
+    return 0
+
+
+def _plan_sync_market(args: argparse.Namespace) -> int:
+    plan = build_sync_market_plan(args.config_dir)
+    if args.json_output:
+        print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print("plan: sync-market")
+        print("dry_run: true")
+        print(f"run_mode: {plan.run_mode}")
+        print(f"provider: {plan.selected_provider.name}")
+        print(f"schedule: {plan.schedule_job} every {plan.interval_minutes} minutes")
+        print(f"target_tables: {', '.join(plan.target_tables)}")
+        print("will_call_provider: false")
+        print("will_write_database: false")
     return 0
 
 
