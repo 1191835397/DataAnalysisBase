@@ -33,6 +33,7 @@ dev = [
 ]
 providers = [
     "akshare>=1.14.0",
+    "pandas>=2.2.0",
     "tushare>=1.4.0",
 ]
 

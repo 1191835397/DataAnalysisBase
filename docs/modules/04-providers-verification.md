@@ -3,8 +3,8 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `providers` |
-| 验证状态 | `not_started` |
-| 最近更新 | `2026-06-22` |
+| 验证状态 | `partial` |
+| 最近更新 | `2026-06-25` |
 | 关联实现 | [04-providers-implementation.md](./04-providers-implementation.md) |
 
 ## 1. 验收目标
@@ -23,9 +23,9 @@
 
 | 项 | 方法 | 结果 | 备注 |
 |----|------|------|------|
-| `AkshareAdapter.fetch_market_spot()` 成功 | 集成测试 | `not_started` |  |
-| DataFrame 正确映射为 `RawDataset` | 单元测试 | `not_started` |  |
-| 单源异常被包装为 `ProviderError` | 单元测试 | `not_started` |  |
+| `AkshareAdapter.fetch_market_snapshot()` 成功 | 单元测试 | `passed` | Fake DataFrame-like 输入，不联网 |
+| DataFrame 正确映射为 `MarketSnapshotBatch` / `MarketRow` | 单元测试 | `passed` | 覆盖代码、名称、价格、涨跌幅、量比、估值、行业 |
+| 单源异常被包装为 `ProviderError` | 单元测试 | `passed` | 覆盖 fetcher 异常 |
 | `ProviderRegistry` 路由正确 | 单元测试 | `not_started` |  |
 
 ## 4. 边界场景
@@ -37,7 +37,8 @@
 
 ## 5. 已知问题
 
-- 尚未开始实现与验证
+- 尚未进行真实 AKShare 联网手动验证
+- `ProviderRegistry`、限流与健康检查尚未实现
 
 ## 6. 剩余风险
 
@@ -45,4 +46,4 @@
 
 ## 7. 验收结论
 
-当前未达到 Phase A 交付标准；需完成 adapter、registry 与测试。
+当前达到最小 adapter 单元验证标准；Phase A 完整交付仍需完成 registry、健康检查、限流与真实联网手动验证。

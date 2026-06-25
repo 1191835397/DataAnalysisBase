@@ -3,10 +3,10 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `providers` |
-| 状态 | `planned` |
+| 状态 | `in_progress` |
 | Phase | `A` |
 | 负责人 | `TBD` |
-| 最近更新 | `2026-06-22` |
+| 最近更新 | `2026-06-25` |
 | 关联设计 | [04-providers.md](./04-providers.md) |
 
 ## 1. 当前目标
@@ -44,16 +44,18 @@
 ### 已完成
 
 - 数据源设计与字段映射文档已完成
+- `MarketDataProvider` / `MarketSnapshotBatch` 合约已完成
+- `AkshareAdapter.fetch_market_snapshot()` 最小现货快照映射已完成
+- `MarketBulkSync` 已可消费 provider batch 并刷新聚合表
 
 ### 进行中
 
-- 无
+- ProviderRegistry 路由与健康检查
 
 ### 未开始
 
-- Adapter 实现
 - 限流与健康检查
-- Mock 测试
+- 真实 AKShare 联网手动验证
 
 ## 6. 关键决策
 
@@ -78,6 +80,6 @@
 
 ## 10. 下一步动作
 
-1. 先实现 `fetch_market_spot()`
-2. 建 `RawDataset` 封装
-3. 补健康检查与 mock 测试
+1. 实现 ProviderRegistry 路由
+2. 补健康检查与限流策略
+3. 在可联网环境手动验证 AKShare 全市场快照
