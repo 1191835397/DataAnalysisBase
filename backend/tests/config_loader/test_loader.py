@@ -10,7 +10,6 @@ from dataanalysisbase.config_loader.loader import (
     load_watchlist,
 )
 
-
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
 
 

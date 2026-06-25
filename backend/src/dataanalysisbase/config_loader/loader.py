@@ -20,9 +20,10 @@ T = TypeVar("T", bound=BaseModel)
 
 def load_settings() -> Settings:
     try:
-        return Settings()
+        settings = Settings()
     except ValidationError as exc:
         raise ConfigError(f"Invalid environment settings: {exc}") from exc
+    return _resolve_settings_paths(settings)
 
 
 def load_providers(config_dir: Path | None = None) -> ProvidersConfig:
@@ -61,6 +62,29 @@ def load_reconcile_thresholds(config_dir: Path | None = None) -> ReconcileThresh
 
 def _config_dir(config_dir: Path | None = None) -> Path:
     return config_dir if config_dir is not None else load_settings().config_dir
+
+
+def _resolve_settings_paths(settings: Settings) -> Settings:
+    root = _project_root()
+    return settings.model_copy(
+        update={
+            "config_dir": _resolve_project_path(root, settings.config_dir),
+            "data_dir": _resolve_project_path(root, settings.data_dir),
+            "duckdb_path": _resolve_project_path(root, settings.duckdb_path),
+            "chroma_dir": _resolve_project_path(root, settings.chroma_dir),
+        }
+    )
+
+
+def _resolve_project_path(root: Path, path: Path) -> Path:
+    return path if path.is_absolute() else root / path
+
+
+def _project_root() -> Path:
+    for path in (Path.cwd(), *Path.cwd().parents):
+        if (path / "backend").is_dir() and (path / "config").is_dir():
+            return path
+    return Path.cwd()
 
 
 def _load_model(filename: str, model: type[T], *, config_dir: Path | None = None) -> T:

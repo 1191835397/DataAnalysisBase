@@ -3,8 +3,8 @@
 from dataanalysisbase.domain.contracts import FusionResult, MarketRow, RawDataset, SyncResult
 from dataanalysisbase.domain.enums import (
     AlertSeverity,
-    DataStatus,
     DatasetType,
+    DataStatus,
     Market,
     RunStatus,
     SecurityType,

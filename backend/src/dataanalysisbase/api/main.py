@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 from dataanalysisbase import __version__
+from dataanalysisbase.observability.system_status import RuntimeStatus, build_runtime_status
 
 app = FastAPI(title="DataAnalysisBase API", version=__version__)
 
@@ -19,3 +20,10 @@ def api_health() -> dict[str, str]:
     """Return API health under the versioned prefix used by the frontend."""
 
     return health()
+
+
+@app.get("/api/v1/system/status")
+def system_status() -> RuntimeStatus:
+    """Return compact runtime status for diagnostics and UI status panels."""
+
+    return build_runtime_status()

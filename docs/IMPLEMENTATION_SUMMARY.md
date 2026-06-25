@@ -40,6 +40,7 @@
 | 模块间接口 | [MODULE_INTERFACES.md](./MODULE_INTERFACES.md) |
 | 编码硬约束 | [CODING_STANDARDS.md](./CODING_STANDARDS.md) |
 | 实现顺序 | [ROADMAP.md](./ROADMAP.md) |
+| 外部框架参考 | [FRAMEWORK_REFERENCES.md](./FRAMEWORK_REFERENCES.md) |
 | API 细节 | [modules/08-api.md](./modules/08-api.md) |
 | 前端细节 | [modules/09-frontend.md](./modules/09-frontend.md) |
 | 配置样例 | [CONFIG_REFERENCE.md](./CONFIG_REFERENCE.md) 与 [examples/](./examples/) |
@@ -202,3 +203,25 @@ config/
 如果目标是尽快看到可运行页面，优先级应是：
 
 `MarketBulkSync > AggregateRepo > FastAPI > React 三页`
+
+## 11. 外部项目参考
+
+已对 `superpowers`、`claw-code`、`ECC`、`anthropics/financial-services`、`TauricResearch/TradingAgents` 与 `666ghj/MiroFish` 做参考分析，结论见 [FRAMEWORK_REFERENCES.md](./FRAMEWORK_REFERENCES.md)。
+
+当前不直接引入外部 Agent 框架、agent harness、hooks、LangGraph、Zep Cloud、OASIS/CAMEL 或 AGPL 项目代码。可吸收的内容分三类：
+
+- Phase A/B：优先落地 `dab config validate`、`dab doctor`、`dab status --json`、mock provider 同步测试、System Status API。
+- Phase B/D：借鉴 MiroFish 的任务流形态，补长任务状态持久化、进度日志、报告 artifact 和复杂任务分步 UI。
+- Phase D：把 `ResearchAgent` 升级为结构化投研产物生成器，包含正反观点、风险检查、Tool trace、数据来源、快速核验、全景检索与人工复核声明。
+- Phase F：用轻量 pipeline 做告警聚类叙事、每日市场综述、自然语言筛选、持仓/组合风险摘要和可选市场事件沙盘。
+
+这些能力不得改变当前边界：不做自动交易，不给买卖建议，LLM 不生产数字，模拟视角或情景推演必须明确标注，未解决 L3 对账差异时禁止确定性结论。
+
+首批已按“项目内化”方式落地：
+
+- `dab config validate`
+- `dab doctor`
+- `dab status --json`
+- `/api/v1/system/status`
+
+这些命令和接口只做本地配置、状态、数据新鲜度诊断，不安装或接管任何外部 harness 生态。
