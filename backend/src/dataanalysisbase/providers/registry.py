@@ -7,6 +7,7 @@ from dataanalysisbase.config_loader.providers_cfg import ProviderEntry, Provider
 from dataanalysisbase.domain.enums import DatasetType
 from dataanalysisbase.providers.akshare_adapter import AkshareAdapter
 from dataanalysisbase.providers.market import MarketDataProvider
+from dataanalysisbase.providers.wrappers import RateLimitedMarketProvider, RetryingMarketProvider
 
 
 class ProviderRegistry:
@@ -18,8 +19,9 @@ class ProviderRegistry:
     def market_snapshot_provider(self) -> MarketDataProvider:
         """Return the configured provider for whole-market spot snapshots."""
 
-        name, _ = self.market_snapshot_provider_config()
-        return _build_market_provider(name)
+        name, provider_config = self.market_snapshot_provider_config()
+        provider = _build_market_provider(name)
+        return _wrap_market_provider(provider, provider_config)
 
     def market_snapshot_provider_config(self) -> tuple[str, ProviderEntry]:
         """Return provider name and config for whole-market spot snapshots."""
@@ -38,3 +40,19 @@ def _build_market_provider(name: str) -> MarketDataProvider:
     if name == "akshare":
         return AkshareAdapter()
     raise ConfigError(f"Unsupported market_spot provider: {name}")
+
+
+def _wrap_market_provider(
+    provider: MarketDataProvider,
+    provider_config: ProviderEntry,
+) -> MarketDataProvider:
+    rate_limit = provider_config.rate_limit
+    wrapped: MarketDataProvider = RetryingMarketProvider(
+        provider,
+        retries=rate_limit.retry,
+        delay_sec=rate_limit.retry_delay_sec,
+    )
+    return RateLimitedMarketProvider(
+        wrapped,
+        requests_per_minute=rate_limit.requests_per_minute,
+    )

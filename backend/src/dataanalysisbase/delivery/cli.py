@@ -52,6 +52,7 @@ def _build_parser() -> argparse.ArgumentParser:
     config_validate.add_argument("--json", action="store_true", dest="json_output")
 
     doctor = subparsers.add_parser("doctor", help="Run local diagnostics")
+    doctor.add_argument("--config-dir", type=Path, default=None)
     doctor.add_argument("--json", action="store_true", dest="json_output")
 
     status = subparsers.add_parser("status", help="Print runtime status")
@@ -83,7 +84,12 @@ def _config_validate(args: argparse.Namespace) -> int:
 
 
 def _doctor(args: argparse.Namespace) -> int:
-    results = run_doctor()
+    settings = None
+    if args.config_dir is not None:
+        from dataanalysisbase.config_loader import load_settings
+
+        settings = load_settings().model_copy(update={"config_dir": args.config_dir})
+    results = run_doctor(settings)
     _emit(results, json_output=args.json_output)
     return 1 if has_errors(results) else 0
 

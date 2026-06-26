@@ -3,7 +3,7 @@ import pytest
 from dataanalysisbase.common.errors import ConfigError
 from dataanalysisbase.config_loader.providers_cfg import ProviderEntry, ProvidersConfig
 from dataanalysisbase.domain.enums import DatasetType
-from dataanalysisbase.providers import AkshareAdapter, ProviderRegistry
+from dataanalysisbase.providers import ProviderRegistry
 
 
 def test_registry_selects_enabled_market_spot_provider_by_priority() -> None:
@@ -34,7 +34,7 @@ def test_registry_selects_enabled_market_spot_provider_by_priority() -> None:
 
     assert name == "akshare"
     assert provider.priority == 10
-    assert isinstance(registry.market_snapshot_provider(), AkshareAdapter)
+    assert registry.market_snapshot_provider().name == "akshare"
 
 
 def test_registry_requires_enabled_market_spot_provider() -> None:

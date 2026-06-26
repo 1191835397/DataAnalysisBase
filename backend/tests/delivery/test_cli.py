@@ -30,7 +30,7 @@ def test_config_validate_json_succeeds(capsys) -> None:
 
 
 def test_doctor_json_includes_provider_health(capsys) -> None:
-    exit_code = main(["doctor", "--json"])
+    exit_code = main(["doctor", "--config-dir", str(ROOT_CONFIG), "--json"])
 
     captured = capsys.readouterr()
     payload = json.loads(captured.out)

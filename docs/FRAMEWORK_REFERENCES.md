@@ -446,4 +446,4 @@ structured_data
 
 - Phase A 先提供最小诊断面：`dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、最近 market run 状态、`/api/v1/system/status`。
 - 已补齐 mock provider 同步测试。
-- 后续补齐 Web System Status 页面、provider 限流、联网健康检查和真实联网验证。
+- 后续补齐 Web System Status 页面、联网健康检查、上游断连退避策略和真实成功快照验证。

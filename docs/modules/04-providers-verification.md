@@ -32,6 +32,8 @@
 | `/api/v1/system/status` provider health | API 测试 | `passed` | 返回 `providers` 列表 |
 | 真实 `dab sync market --execute` | 手动验证 | `blocked` | AKShare/Eastmoney 远端断开连接；失败 run 已落库 |
 | 最近 market run 状态 | CLI/API 测试 + 手动验证 | `passed` | `dab status --json` 返回 `last_market_run` 和失败原因 |
+| provider retry wrapper | 单元测试 | `passed` | 只重试 `retryable=True` 的 `ProviderError` |
+| provider rate limit wrapper | 单元测试 | `passed` | 按 `requests_per_minute` 控制单进程最小间隔 |
 
 ## 4. 边界场景
 
@@ -44,12 +46,12 @@
 
 - 真实 AKShare 请求已到达上游，但 Eastmoney 远端返回 `RemoteDisconnected`，尚未取得成功快照
 - 联网健康检查尚未实现
-- 限流策略尚未实现
+- 当前只有单进程固定间隔限流，还没有指数退避或备用接口
 
 ## 6. 剩余风险
 
-- 免费源真实请求可能被上游断开，需要限流、重试退避或备用接口策略
+- 免费源真实请求可能被上游断开，固定重试仍可能失败，需要指数退避或备用接口策略
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health 与失败 run 持久化验证标准；Phase A 完整交付仍需完成限流、联网健康检查，并取得一次成功真实快照。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、retry/限流 wrapper 与失败 run 持久化验证标准；Phase A 完整交付仍需完成联网健康检查、上游断连退避策略，并取得一次成功真实快照。

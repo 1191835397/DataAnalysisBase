@@ -51,10 +51,11 @@
 - `dab sync market` 已提供默认 dry-run 与显式 `--execute` 手动执行入口
 - provider 本地健康检查已接入 `dab doctor` 与 `/api/v1/system/status`
 - 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
+- provider retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
 
 ### 进行中
 
-- Provider 限流策略
+- 上游断连后的退避与备用接口策略
 
 ### 未开始
 
@@ -84,6 +85,6 @@
 
 ## 10. 下一步动作
 
-1. 补 provider 限流策略
+1. 补指数退避 / 备用接口策略
 2. 在可联网环境取得一次成功 AKShare 全市场快照
 3. 接 API / 前端读取真实快照聚合结果
