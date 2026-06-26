@@ -30,6 +30,7 @@
 | `dab sync market` 默认 dry-run | 单元测试 | `passed` | 不调用 provider，不写 DuckDB |
 | provider 本地健康检查 | 单元测试 | `passed` | 覆盖依赖存在、token 缺失、禁用 provider、未知 provider |
 | `/api/v1/system/status` provider health | API 测试 | `passed` | 返回 `providers` 列表 |
+| provider 联网健康检查 | 单元测试 + CLI/API 测试 | `passed` | 显式 `--online` / `online=true` 才探测上游端点，不拉取行情数据 |
 | 真实 `dab sync market --execute` | 手动验证 | `blocked` | AKShare/Eastmoney 远端断开连接；失败 run 已落库 |
 | 最近 market run 状态 | CLI/API 测试 + 手动验证 | `passed` | `dab status --json` 返回 `last_market_run` 和失败原因 |
 | provider retry wrapper | 单元测试 | `passed` | 只重试 `retryable=True` 的 `ProviderError`，使用指数退避 |
@@ -45,7 +46,6 @@
 ## 5. 已知问题
 
 - 真实 AKShare 请求已到达上游，但 Eastmoney 远端返回 `RemoteDisconnected`，尚未取得成功快照
-- 联网健康检查尚未实现
 - 当前已有指数退避和单进程固定间隔限流，还没有备用接口
 
 ## 6. 剩余风险
@@ -54,4 +54,4 @@
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health、指数退避 retry / 限流 wrapper 与失败 run 持久化验证标准；Phase A 完整交付仍需完成联网健康检查、上游断连备用接口策略，并取得一次成功真实快照。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper 与失败 run 持久化验证标准；Phase A 完整交付仍需完成上游断连备用接口策略，并取得一次成功真实快照。

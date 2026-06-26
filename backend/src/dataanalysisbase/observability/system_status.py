@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from dataanalysisbase.common.errors import ConfigError, StorageError
 from dataanalysisbase.config_loader.loader import (
@@ -20,6 +20,10 @@ from dataanalysisbase.config_loader.loader import (
 )
 from dataanalysisbase.config_loader.settings import Settings
 from dataanalysisbase.domain.enums import DataStatus
+from dataanalysisbase.observability.provider_connectivity import (
+    ProviderConnectivity,
+    build_provider_connectivity,
+)
 from dataanalysisbase.observability.provider_health import (
     ProviderHealth,
     build_provider_health,
@@ -76,6 +80,7 @@ class RuntimeStatus(BaseModel):
     duckdb_path: str
     config_dir: str
     providers: list[ProviderHealth]
+    provider_connectivity: list[ProviderConnectivity] = Field(default_factory=list)
     last_market_run: MarketRunStatus | None = None
 
 
@@ -97,8 +102,12 @@ def validate_config(config_dir: Path | None = None) -> list[CheckResult]:
     return results
 
 
-def run_doctor(settings: Settings | None = None) -> list[CheckResult]:
-    """Run local health checks without calling external data providers."""
+def run_doctor(
+    settings: Settings | None = None,
+    *,
+    include_online: bool = False,
+) -> list[CheckResult]:
+    """Run diagnostics, with online provider probes only when explicitly requested."""
 
     settings = settings or load_settings()
     results: list[CheckResult] = []
@@ -109,17 +118,24 @@ def run_doctor(settings: Settings | None = None) -> list[CheckResult]:
     results.append(_secret_presence_check("DAB_TUSHARE_TOKEN", settings.tushare_token))
     results.append(_secret_presence_check("DAB_DEEPSEEK_API_KEY", settings.deepseek_api_key))
     results.extend(_provider_checks(settings.config_dir))
+    if include_online:
+        results.extend(_provider_connectivity_checks(settings.config_dir))
     results.append(_duckdb_check(settings.duckdb_path))
     return results
 
 
-def build_runtime_status(settings: Settings | None = None) -> RuntimeStatus:
+def build_runtime_status(
+    settings: Settings | None = None,
+    *,
+    include_online: bool = False,
+) -> RuntimeStatus:
     """Build a compact system status snapshot without mutating runtime state."""
 
     settings = settings or load_settings()
     snapshot_state = _snapshot_state(settings.duckdb_path)
     latest_snapshot_time = snapshot_state.latest_snapshot_time
     providers = _provider_health(settings.config_dir)
+    provider_connectivity = _provider_connectivity(settings.config_dir) if include_online else []
     return RuntimeStatus(
         generated_at=datetime.now(UTC),
         run_mode=settings.run_mode,
@@ -128,6 +144,7 @@ def build_runtime_status(settings: Settings | None = None) -> RuntimeStatus:
         duckdb_path=str(settings.duckdb_path),
         config_dir=str(settings.config_dir),
         providers=providers,
+        provider_connectivity=provider_connectivity,
         last_market_run=snapshot_state.last_market_run,
     )
 
@@ -191,12 +208,38 @@ def _provider_checks(config_dir: Path) -> list[CheckResult]:
     ]
 
 
+def _provider_connectivity_checks(config_dir: Path) -> list[CheckResult]:
+    try:
+        connectivity = _provider_connectivity(config_dir)
+    except ConfigError as exc:
+        return [
+            CheckResult(
+                name="provider_connectivity",
+                status="error",
+                message=_single_line(str(exc)),
+            )
+        ]
+    return [
+        CheckResult(
+            name=f"provider_connectivity:{provider.name}",
+            status=provider.status,
+            message=provider.message,
+        )
+        for provider in connectivity
+    ]
+
+
 def _provider_health(config_dir: Path) -> list[ProviderHealth]:
     try:
         providers = load_providers(config_dir)
     except ConfigError as exc:
         return [provider_config_error(_single_line(str(exc)))]
     return build_provider_health(providers)
+
+
+def _provider_connectivity(config_dir: Path) -> list[ProviderConnectivity]:
+    providers = load_providers(config_dir)
+    return build_provider_connectivity(providers)
 
 
 class _SnapshotState(BaseModel):

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from dataanalysisbase.delivery.cli import main
+from dataanalysisbase.observability.provider_connectivity import ProviderConnectivity
 
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
 
@@ -16,6 +17,7 @@ def test_status_json_outputs_machine_readable_payload(capsys) -> None:
     assert payload["service"] == "dataanalysisbase"
     assert "data_status" in payload
     assert "providers" in payload
+    assert payload["provider_connectivity"] == []
     assert "last_market_run" in payload
 
 
@@ -37,3 +39,27 @@ def test_doctor_json_includes_provider_health(capsys) -> None:
 
     assert exit_code in {0, 1}
     assert any(item["name"] == "provider:akshare" for item in payload)
+
+
+def test_doctor_online_json_includes_provider_connectivity(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        "dataanalysisbase.observability.system_status.build_provider_connectivity",
+        lambda _providers: [
+            ProviderConnectivity(
+                name="akshare",
+                status="ok",
+                enabled=True,
+                endpoint="https://www.eastmoney.com/",
+                message="HTTP 200 in 12 ms",
+                elapsed_ms=12.0,
+            )
+        ],
+    )
+
+    exit_code = main(["doctor", "--config-dir", str(ROOT_CONFIG), "--online", "--json"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code in {0, 1}
+    assert any(item["name"] == "provider_connectivity:akshare" for item in payload)

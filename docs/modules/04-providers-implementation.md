@@ -50,6 +50,7 @@
 - `MarketBulkSync` 已可消费 provider batch 并刷新聚合表
 - `dab sync market` 已提供默认 dry-run 与显式 `--execute` 手动执行入口
 - provider 本地健康检查已接入 `dab doctor` 与 `/api/v1/system/status`
+- provider 联网健康检查已通过显式 `--online` / `online=true` 接入 `dab doctor`、`dab status` 与 `/api/v1/system/status`
 - 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
 - provider 指数退避 retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
 
@@ -59,7 +60,6 @@
 
 ### 未开始
 
-- 联网健康检查
 - 成功真实 AKShare 快照验证
 
 ## 6. 关键决策

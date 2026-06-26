@@ -23,7 +23,7 @@ def api_health() -> dict[str, str]:
 
 
 @app.get("/api/v1/system/status")
-def system_status() -> RuntimeStatus:
+def system_status(online: bool = False) -> RuntimeStatus:
     """Return compact runtime status for diagnostics and UI status panels."""
 
-    return build_runtime_status()
+    return build_runtime_status(include_online=online)

@@ -53,9 +53,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser("doctor", help="Run local diagnostics")
     doctor.add_argument("--config-dir", type=Path, default=None)
+    doctor.add_argument("--online", action="store_true", help="Probe provider upstream endpoints")
     doctor.add_argument("--json", action="store_true", dest="json_output")
 
     status = subparsers.add_parser("status", help="Print runtime status")
+    status.add_argument("--online", action="store_true", help="Probe provider upstream endpoints")
     status.add_argument("--json", action="store_true", dest="json_output")
 
     plan_parser = subparsers.add_parser("plan", help="Preview operational actions")
@@ -89,13 +91,13 @@ def _doctor(args: argparse.Namespace) -> int:
         from dataanalysisbase.config_loader import load_settings
 
         settings = load_settings().model_copy(update={"config_dir": args.config_dir})
-    results = run_doctor(settings)
+    results = run_doctor(settings, include_online=args.online)
     _emit(results, json_output=args.json_output)
     return 1 if has_errors(results) else 0
 
 
 def _status(args: argparse.Namespace) -> int:
-    status = build_runtime_status()
+    status = build_runtime_status(include_online=args.online)
     if args.json_output:
         print(json.dumps(status.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
@@ -108,6 +110,8 @@ def _status(args: argparse.Namespace) -> int:
         if status.last_market_run is not None:
             print(f"last_market_run_status: {status.last_market_run.status}")
             print(f"last_market_run_time: {status.last_market_run.snapshot_time}")
+        for provider in status.provider_connectivity:
+            print(f"provider_connectivity:{provider.name}: {provider.status} ({provider.message})")
     return 0
 
 

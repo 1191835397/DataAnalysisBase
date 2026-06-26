@@ -423,7 +423,7 @@ structured_data
 
 现在不引入外部 Agent 框架或 agent harness；先把 Phase A 数据闭环做稳。
 
-近期已落地：`dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、最近 market run 状态、mock provider 同步测试。
+近期已落地：`dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、显式联网健康检查、最近 market run 状态、mock provider 同步测试。
 
 后续最值得落地的是：把 Phase D 的 `ResearchAgent` 做成结构化投研产物生成器，并在 Phase F 用轻量 pipeline 实现正反观点、风险检查、市场事件叙事、组合风险摘要和可选情景推演。
 
@@ -436,7 +436,7 @@ structured_data
 | 外部思想 | 本项目化产物 | 接入边界 |
 |----------|--------------|----------|
 | Superpowers 流程纪律 | `MODULE_DELIVERY_STANDARD.md`、模块 implementation/verification 文档、测试先行约束 | 不安装 skills/hooks/bootstrap |
-| ECC 治理/诊断形态 | `dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、最近 market run 状态、`/api/v1/system/status` | 不接管多 harness 配置，不引入 hooks runtime |
+| ECC 治理/诊断形态 | `dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、显式联网健康检查、最近 market run 状态、`/api/v1/system/status` | 不接管多 harness 配置，不引入 hooks runtime |
 | Claw Code mock parity | mock provider 同步测试、状态 JSON 输出 | 不引入 agent CLI harness |
 | 金融工作流模板 | Phase D 结构化研报模板 | 不接入 Claude 插件生态 |
 | 多角色投研 | Phase F 轻量 pipeline | 不引入 LangGraph，不输出交易动作 |
@@ -444,6 +444,6 @@ structured_data
 
 已落地方向：
 
-- Phase A 先提供最小诊断面：`dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、最近 market run 状态、`/api/v1/system/status`。
+- Phase A 先提供最小诊断面：`dab config validate`、`dab doctor`、`dab status --json`、`dab plan sync-market`、`dab sync market` dry-run、provider 本地健康检查、显式联网健康检查、最近 market run 状态、`/api/v1/system/status`。
 - 已补齐 mock provider 同步测试。
-- 后续补齐 Web System Status 页面、联网健康检查、上游断连备用接口策略和真实成功快照验证。
+- 后续补齐 Web System Status 页面、上游断连备用接口策略和真实成功快照验证。
