@@ -18,7 +18,7 @@ def test_retrying_market_provider_retries_retryable_errors() -> None:
 
     assert batch.source == "mock"
     assert provider.calls == 3
-    assert sleeps == [0.5, 0.5]
+    assert sleeps == [0.5, 1.0]
 
 
 def test_retrying_market_provider_does_not_retry_non_retryable_errors() -> None:
@@ -46,6 +46,24 @@ def test_rate_limited_market_provider_waits_between_calls() -> None:
     wrapped.fetch_market_snapshot(datetime(2026, 6, 26, 9, 31))
 
     assert sleeps == [2.0]
+
+
+def test_retrying_rate_limited_provider_waits_before_retry_calls() -> None:
+    provider = FlakyProvider(failures=1)
+    clock = FakeClock([10.0, 10.0, 10.0])
+    sleeps: list[float] = []
+    rate_limited = RateLimitedMarketProvider(
+        provider,
+        requests_per_minute=30,
+        monotonic=clock.monotonic,
+        sleep=sleeps.append,
+    )
+    wrapped = RetryingMarketProvider(rate_limited, retries=1, delay_sec=0.5, sleep=sleeps.append)
+
+    wrapped.fetch_market_snapshot(datetime(2026, 6, 26, 9, 30))
+
+    assert provider.calls == 2
+    assert sleeps == [0.5, 2.0]
 
 
 class SuccessfulProvider:

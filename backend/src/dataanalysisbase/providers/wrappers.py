@@ -11,7 +11,7 @@ from dataanalysisbase.providers.market import MarketDataProvider, MarketSnapshot
 
 
 class RetryingMarketProvider:
-    """Retry retryable provider errors before surfacing failure."""
+    """Retry retryable provider errors with exponential backoff."""
 
     def __init__(
         self,
@@ -24,7 +24,7 @@ class RetryingMarketProvider:
         self.provider = provider
         self.name = provider.name
         self.retries = max(retries, 0)
-        self.delay_sec = max(delay_sec, 0)
+        self.delay_sec: float = max(delay_sec, 0.0)
         self._sleep = sleep
 
     def fetch_market_snapshot(self, snapshot_time: datetime) -> MarketSnapshotBatch:
@@ -38,11 +38,14 @@ class RetryingMarketProvider:
                     raise
                 last_error = exc
                 if attempt < attempts and self.delay_sec > 0:
-                    self._sleep(self.delay_sec)
+                    self._sleep(self._delay_for_retry(attempt))
         if last_error is not None:
             raise last_error
         msg = "retry loop exited without result"
         raise RuntimeError(msg)
+
+    def _delay_for_retry(self, attempt: int) -> float:
+        return self.delay_sec * (2.0 ** (attempt - 1))
 
 
 class RateLimitedMarketProvider:

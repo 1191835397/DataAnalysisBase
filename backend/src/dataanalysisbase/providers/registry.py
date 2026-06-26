@@ -47,12 +47,12 @@ def _wrap_market_provider(
     provider_config: ProviderEntry,
 ) -> MarketDataProvider:
     rate_limit = provider_config.rate_limit
-    wrapped: MarketDataProvider = RetryingMarketProvider(
+    rate_limited: MarketDataProvider = RateLimitedMarketProvider(
         provider,
+        requests_per_minute=rate_limit.requests_per_minute,
+    )
+    return RetryingMarketProvider(
+        rate_limited,
         retries=rate_limit.retry,
         delay_sec=rate_limit.retry_delay_sec,
-    )
-    return RateLimitedMarketProvider(
-        wrapped,
-        requests_per_minute=rate_limit.requests_per_minute,
     )
