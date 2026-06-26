@@ -3,7 +3,7 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `providers` |
-| 状态 | `in_progress` |
+| 状态 | `done` |
 | Phase | `A` |
 | 负责人 | `TBD` |
 | 最近更新 | `2026-06-25` |
@@ -54,10 +54,7 @@
 - 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
 - provider 指数退避 retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
 - `AkshareAdapter` 已按 `stock_zh_a_spot_em` -> `stock_zh_a_spot` 顺序提供现货快照备用接口策略
-
-### 未开始
-
-- 成功真实 AKShare 快照验证
+- 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
 
@@ -82,5 +79,4 @@
 
 ## 10. 下一步动作
 
-1. 在可联网环境取得一次成功 AKShare 全市场快照
-2. 接 API / 前端读取真实快照聚合结果
+1. 接 API / 前端读取真实快照聚合结果
