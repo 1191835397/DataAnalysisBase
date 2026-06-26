@@ -37,6 +37,33 @@ def test_registry_selects_enabled_market_spot_provider_by_priority() -> None:
     assert registry.market_snapshot_provider().name == "akshare"
 
 
+def test_registry_injects_akshare_industry_mapping_file(tmp_path, monkeypatch) -> None:
+    mapping_path = tmp_path / "industry_mapping.csv"
+    mapping_path.write_text("security_id,industry\n600519.SH,白酒\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "dataanalysisbase.providers.registry.load_settings",
+        lambda: type("Settings", (), {"data_dir": tmp_path})(),
+    )
+    registry = ProviderRegistry(
+        ProvidersConfig(
+            version="1.0",
+            providers={
+                "akshare": ProviderEntry(
+                    enabled=True,
+                    priority=10,
+                    datasets=[DatasetType.MARKET_SPOT],
+                    industry_mapping_path=mapping_path.name,
+                ),
+            },
+        )
+    )
+
+    provider = registry.market_snapshot_provider()
+    adapter = provider.provider.provider
+
+    assert adapter._fetch_industry_by_code() == {"600519.SH": "白酒"}
+
+
 def test_registry_requires_enabled_market_spot_provider() -> None:
     registry = ProviderRegistry(
         ProvidersConfig(

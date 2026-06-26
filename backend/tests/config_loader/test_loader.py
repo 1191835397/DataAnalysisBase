@@ -18,6 +18,7 @@ def test_load_providers_reads_runtime_config() -> None:
 
     assert providers.providers["akshare"].enabled is True
     assert providers.providers["akshare"].rate_limit.requests_per_minute == 30
+    assert str(providers.providers["akshare"].industry_mapping_path) == "industry_mapping.csv"
 
 
 def test_load_sync_schedule_requires_valid_jobs() -> None:

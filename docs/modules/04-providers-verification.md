@@ -38,6 +38,7 @@
 | AKShare 备用现货接口 | 单元测试 | `passed` | `stock_zh_a_spot_em` 失败后 fallback 到 `stock_zh_a_spot`，不联网 |
 | AKShare 行业字段补全 | 单元测试 | `passed` | mock 行业板块和成分股接口；行业接口失败时不阻断快照 |
 | 行业备用映射入口 | 单元测试 | `passed` | `industry_mapping_fetcher` 可补行业；板块接口结果优先；映射失败不阻断快照 |
+| 本地行业映射文件 | 单元测试 | `passed` | 支持 CSV / JSON；`ProviderRegistry` 可按 `industry_mapping_path` 注入读取器 |
 | 真实 AKShare 行业接口 | 手动验证 | `blocked` | `stock_board_industry_name_em` 当前返回 `RemoteDisconnected` |
 
 ## 4. 边界场景
@@ -51,13 +52,13 @@
 
 - 免费源仍可能因上游策略、接口变更或网络权限失败，需要保留失败 run 与 status 诊断
 - 行业补全已具备降级实现，但真实行业接口当前不可用，真实同步仍可能继续产生 `UNKNOWN` 行业
-- 行业备用映射入口尚未接入 registry 或真实数据源，当前只是后续本地静态映射 / Tushare / CNInfo 接入插槽
+- 本地行业映射文件入口已接入 registry，但真实 `data/industry_mapping.csv` 尚未生成或维护
 
 ## 6. 剩余风险
 
 - AKShare/Eastmoney 免费接口稳定性不可保证，后续仍需观察失败率并评估 Tushare / 其他源补充
-- 行业分类仍需要落地真实备用源，否则行业页数据质量依赖单个 AKShare 行业接口
+- 行业分类仍需要落地真实映射文件或自动生成流程，否则行业页数据质量依赖单个 AKShare 行业接口
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。行业字段补全和备用映射入口已通过 mock 测试，但真实行业接口当前阻塞，需后续验证或接入真实备用源。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。行业字段补全、本地备用映射入口和 registry 注入已通过 mock 测试，但真实行业接口当前阻塞，需后续补充真实映射文件或自动生成流程。

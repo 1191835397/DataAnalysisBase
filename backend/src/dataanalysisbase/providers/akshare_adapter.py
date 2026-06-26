@@ -255,7 +255,7 @@ def _row_from_record(
 
 
 def _security_id_from_record(record: Mapping[str, Any]) -> str | None:
-    raw_code = _string_value(record, "代码", "code", "symbol")
+    raw_code = _string_value(record, "security_id", "代码", "code", "symbol")
     if raw_code is None:
         return None
     try:

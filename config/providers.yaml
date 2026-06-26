@@ -6,6 +6,7 @@ providers:
   akshare:
     enabled: true
     priority: 2
+    industry_mapping_path: industry_mapping.csv
     rate_limit:
       requests_per_minute: 30
       retry: 3

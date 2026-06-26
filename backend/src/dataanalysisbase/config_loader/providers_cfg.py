@@ -1,5 +1,7 @@
 """Provider configuration models."""
 
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from dataanalysisbase.domain.enums import DatasetType
@@ -20,6 +22,7 @@ class ProviderEntry(BaseModel):
     priority: int = 100
     datasets: list[DatasetType] = Field(default_factory=list)
     token_env: str | None = None
+    industry_mapping_path: Path | None = None
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
 
