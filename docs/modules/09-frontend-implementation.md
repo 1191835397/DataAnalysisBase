@@ -83,6 +83,6 @@
 
 ## 10. 下一步动作
 
-1. 初始化 Vite + React + TS
-2. 搭 `AppShell`
-3. 先接 `/market/overview` 和 `/stocks`
+1. 安装 npm 依赖并完成构建验证
+2. 用 `/api/v1/market/overview` 替换市场总览占位数据
+3. 用 `/api/v1/stocks` 替换股票列表占位数据

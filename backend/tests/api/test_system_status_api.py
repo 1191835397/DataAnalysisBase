@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from dataanalysisbase.api.main import app
+from dataanalysisbase.config_loader.providers_cfg import ProviderEntry, ProvidersConfig
 from dataanalysisbase.observability.provider_connectivity import ProviderConnectivity
 
 
@@ -20,6 +21,13 @@ def test_system_status_endpoint_returns_runtime_status() -> None:
 
 
 def test_system_status_endpoint_can_include_online_connectivity(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dataanalysisbase.observability.system_status.load_providers",
+        lambda _config_dir: ProvidersConfig(
+            version="1.0",
+            providers={"akshare": ProviderEntry(enabled=True)},
+        ),
+    )
     monkeypatch.setattr(
         "dataanalysisbase.observability.system_status.build_provider_connectivity",
         lambda _providers: [

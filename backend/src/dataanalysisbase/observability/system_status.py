@@ -238,7 +238,18 @@ def _provider_health(config_dir: Path) -> list[ProviderHealth]:
 
 
 def _provider_connectivity(config_dir: Path) -> list[ProviderConnectivity]:
-    providers = load_providers(config_dir)
+    try:
+        providers = load_providers(config_dir)
+    except ConfigError as exc:
+        return [
+            ProviderConnectivity(
+                name="provider_config",
+                status="error",
+                enabled=False,
+                endpoint=None,
+                message=_single_line(str(exc)),
+            )
+        ]
     return build_provider_connectivity(providers)
 
 

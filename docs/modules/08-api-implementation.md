@@ -50,16 +50,18 @@
 - 已初始化 `backend/src/dataanalysisbase/api/`
 - 已提供最小 `FastAPI` 应用入口
 - 已提供 `/health` 与 `/api/v1/health`
+- 已提供 `/api/v1/system/status`，支持可选 `online=true` provider 连通性诊断
+- 已提供 `/api/v1/market/overview`，读取最新 `market_overview_snapshots`
+- 已提供 `/api/v1/stocks`，读取 `latest_market_snapshot` 并支持分页、排序、筛选
 
 ### 进行中
 
-- 等待 Python 3.11 与依赖环境后运行 FastAPI/TestClient 验证
+- 行业排行与行业成分股 API
 
 ### 未开始
 
-- Phase A 业务路由实现
 - 错误处理器
-- 契约测试
+- 统一 Envelope 响应包装
 
 ## 6. 关键决策
 
@@ -83,6 +85,6 @@
 
 ## 10. 下一步动作
 
-1. 安装或切换到 Python 3.11
-2. 先验证 `/api/v1/health`
-3. 再补 `market`、`stocks`、`industries`、`system/status`
+1. 补 `/api/v1/industries`
+2. 补 `/api/v1/industries/{code}/stocks`
+3. 评估是否按原设计引入统一 Envelope

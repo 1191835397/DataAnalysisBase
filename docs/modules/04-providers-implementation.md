@@ -79,4 +79,5 @@
 
 ## 10. 下一步动作
 
-1. 接 API / 前端读取真实快照聚合结果
+1. 前端接入 `/api/v1/market/overview` 与 `/api/v1/stocks`
+2. 后端补 `/api/v1/industries` 与行业成分股接口
