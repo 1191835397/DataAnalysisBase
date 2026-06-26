@@ -26,11 +26,13 @@ class AkshareAdapter:
         spot_fetchers: tuple[tuple[str, Callable[[], Any]], ...] | None = None,
         industry_name_fetcher: Callable[[], Any] | None = None,
         industry_cons_fetcher: Callable[[str], Any] | None = None,
+        industry_mapping_fetcher: Callable[[], Any] | None = None,
     ) -> None:
         self._spot_fetcher = spot_fetcher
         self._spot_fetchers = spot_fetchers
         self._industry_name_fetcher = industry_name_fetcher
         self._industry_cons_fetcher = industry_cons_fetcher
+        self._industry_mapping_fetcher = industry_mapping_fetcher
 
     def fetch_market_snapshot(self, snapshot_time: datetime) -> MarketSnapshotBatch:
         """Fetch a whole-market spot snapshot and normalize it."""
@@ -78,16 +80,16 @@ class AkshareAdapter:
         return _fetch_first_available(fetchers)
 
     def _fetch_industry_by_code(self) -> dict[str, str]:
+        industry_by_code = self._fetch_industry_mapping_by_code()
         name_fetcher, cons_fetcher = self._industry_fetchers()
         if name_fetcher is None or cons_fetcher is None:
-            return {}
+            return industry_by_code
 
         try:
             industry_records = _records_from_frame(name_fetcher())
         except Exception:
-            return {}
+            return industry_by_code
 
-        industry_by_code: dict[str, str] = {}
         for industry_record in industry_records:
             industry_name = _string_value(
                 industry_record,
@@ -107,6 +109,15 @@ class AkshareAdapter:
                 if security_id is not None:
                     industry_by_code[security_id] = industry_name
         return industry_by_code
+
+    def _fetch_industry_mapping_by_code(self) -> dict[str, str]:
+        if self._industry_mapping_fetcher is None:
+            return {}
+
+        try:
+            return _industry_mapping_from_source(self._industry_mapping_fetcher())
+        except Exception:
+            return {}
 
     def _industry_fetchers(self) -> tuple[Callable[[], Any] | None, Callable[[str], Any] | None]:
         if self._industry_name_fetcher is not None and self._industry_cons_fetcher is not None:
@@ -159,6 +170,42 @@ def _records_from_frame(frame: Any) -> list[Mapping[str, Any]]:
         return [record for record in frame if isinstance(record, Mapping)]
     msg = "AKShare market spot response must be a DataFrame-like object"
     raise TypeError(msg)
+
+
+def _industry_mapping_from_source(source: Any) -> dict[str, str]:
+    if isinstance(source, Mapping):
+        return _industry_mapping_from_mapping(source)
+
+    industry_by_code: dict[str, str] = {}
+    for record in _records_from_frame(source):
+        security_id = _security_id_from_record(record)
+        industry = _string_value(
+            record,
+            "行业",
+            "industry",
+            "industry_code",
+            "industry_name",
+            "板块名称",
+            "sector",
+            "sector_name",
+        )
+        if security_id is not None and industry is not None:
+            industry_by_code[security_id] = industry
+    return industry_by_code
+
+
+def _industry_mapping_from_mapping(source: Mapping[Any, Any]) -> dict[str, str]:
+    industry_by_code: dict[str, str] = {}
+    for raw_code, raw_industry in source.items():
+        industry = str(raw_industry).strip() if raw_industry is not None else ""
+        if not industry:
+            continue
+        try:
+            security_id = str(SecurityId.parse(str(raw_code)))
+        except InvalidSecurityId:
+            continue
+        industry_by_code[security_id] = industry
+    return industry_by_code
 
 
 def _row_from_record(

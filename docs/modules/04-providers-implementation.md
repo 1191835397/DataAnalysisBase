@@ -55,6 +55,7 @@
 - provider 指数退避 retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
 - `AkshareAdapter` 已按 `stock_zh_a_spot_em` -> `stock_zh_a_spot` 顺序提供现货快照备用接口策略
 - `AkshareAdapter` 已支持用 `stock_board_industry_name_em` + `stock_board_industry_cons_em` 补全缺失行业字段，行业接口失败时降级保留快照
+- `AkshareAdapter` 已预留 `industry_mapping_fetcher` 备用映射入口，可承接后续 Tushare / CNInfo / 本地静态行业映射；当前 registry 尚未接真实备用源
 - 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
@@ -82,4 +83,4 @@
 ## 10. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
-2. 评估 Tushare / CNInfo 行业分类作为备用源
+2. 选定并接入一个真实行业备用源：优先本地静态映射或 Tushare `stock_basic`，再评估 CNInfo
