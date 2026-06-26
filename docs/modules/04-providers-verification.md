@@ -39,6 +39,7 @@
 | AKShare 行业字段补全 | 单元测试 | `passed` | mock 行业板块和成分股接口；行业接口失败时不阻断快照 |
 | 行业备用映射入口 | 单元测试 | `passed` | `industry_mapping_fetcher` 可补行业；板块接口结果优先；映射失败不阻断快照 |
 | 本地行业映射文件 | 单元测试 | `passed` | 支持 CSV / JSON；`ProviderRegistry` 可按 `industry_mapping_path` 注入读取器 |
+| 行业映射诊断 | 单元测试 | `passed` | `dab doctor` 可报告映射文件缺失 warning、解析成功记录数 |
 | 真实 AKShare 行业接口 | 手动验证 | `blocked` | `stock_board_industry_name_em` 当前返回 `RemoteDisconnected` |
 
 ## 4. 边界场景

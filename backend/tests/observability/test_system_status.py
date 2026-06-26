@@ -44,7 +44,34 @@ def test_doctor_reports_secret_presence_without_leaking_values(tmp_path: Path) -
         for result in results
     )
     assert any(result.name == "provider:akshare" for result in results)
+    assert any(
+        result.name == "industry_mapping:akshare" and result.status == "warning"
+        for result in results
+    )
     assert not any(result.name.startswith("provider_connectivity:") for result in results)
+
+
+def test_doctor_reports_industry_mapping_file_record_count(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "industry_mapping.csv").write_text(
+        "security_id,industry\n600519.SH,白酒\n300750.SZ,电池\n",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        config_dir=ROOT_CONFIG,
+        data_dir=data_dir,
+        duckdb_path=data_dir / "analytics.duckdb",
+    )
+
+    results = run_doctor(settings)
+
+    assert any(
+        result.name == "industry_mapping:akshare"
+        and result.status == "ok"
+        and result.message.startswith("2 records:")
+        for result in results
+    )
 
 
 def test_doctor_can_include_online_provider_connectivity(

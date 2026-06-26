@@ -29,6 +29,7 @@ from dataanalysisbase.observability.provider_health import (
     build_provider_health,
     provider_config_error,
 )
+from dataanalysisbase.providers.industry_mapping import load_industry_mapping_file
 from dataanalysisbase.storage import DuckDBStore, SnapshotRepo
 
 CONFIG_LOADERS = {
@@ -118,6 +119,7 @@ def run_doctor(
     results.append(_secret_presence_check("DAB_TUSHARE_TOKEN", settings.tushare_token))
     results.append(_secret_presence_check("DAB_DEEPSEEK_API_KEY", settings.deepseek_api_key))
     results.extend(_provider_checks(settings.config_dir))
+    results.extend(_industry_mapping_checks(settings))
     if include_online:
         results.extend(_provider_connectivity_checks(settings.config_dir))
     results.append(_duckdb_check(settings.duckdb_path))
@@ -227,6 +229,43 @@ def _provider_connectivity_checks(config_dir: Path) -> list[CheckResult]:
         )
         for provider in connectivity
     ]
+
+
+def _industry_mapping_checks(settings: Settings) -> list[CheckResult]:
+    try:
+        providers = load_providers(settings.config_dir)
+    except ConfigError as exc:
+        return [
+            CheckResult(
+                name="industry_mapping",
+                status="error",
+                message=_single_line(str(exc)),
+            )
+        ]
+
+    results: list[CheckResult] = []
+    for provider_name, provider in sorted(providers.providers.items()):
+        if not provider.enabled or not provider.industry_mapping_path:
+            continue
+        path = _resolve_data_path(settings.data_dir, provider.industry_mapping_path)
+        results.append(_industry_mapping_check(provider_name, path))
+    return results
+
+
+def _industry_mapping_check(provider_name: str, path: Path) -> CheckResult:
+    name = f"industry_mapping:{provider_name}"
+    if not path.exists():
+        return CheckResult(name=name, status="warning", message=f"not found: {path}")
+
+    try:
+        records = load_industry_mapping_file(path)
+    except Exception as exc:
+        return CheckResult(name=name, status="error", message=_single_line(str(exc)))
+    return CheckResult(name=name, status="ok", message=f"{len(records)} records: {path}")
+
+
+def _resolve_data_path(data_dir: Path, path: Path) -> Path:
+    return path if path.is_absolute() else data_dir / path
 
 
 def _provider_health(config_dir: Path) -> list[ProviderHealth]:
