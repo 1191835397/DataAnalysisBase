@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -97,6 +98,64 @@ def test_akshare_adapter_wraps_fetch_errors() -> None:
     assert "upstream unavailable" in str(exc_info.value)
 
 
+def test_akshare_adapter_falls_back_to_secondary_spot_fetcher() -> None:
+    calls: list[str] = []
+    adapter = AkshareAdapter(
+        spot_fetchers=(
+            ("stock_zh_a_spot_em", _tracked_failure("primary disconnected", calls, "primary")),
+            (
+                "stock_zh_a_spot",
+                lambda: FakeFrame(
+                    [
+                        {
+                            "code": "600519",
+                            "name": "贵州茅台",
+                            "price": "1688.00",
+                            "change_pct": "1.25",
+                        }
+                    ]
+                ),
+            ),
+        )
+    )
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert calls == ["primary"]
+    assert batch.expected == 1
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].price == 1688.0
+
+
+def test_akshare_adapter_reports_all_spot_fetcher_failures() -> None:
+    adapter = AkshareAdapter(
+        spot_fetchers=(
+            ("stock_zh_a_spot_em", _raise_named_fetch_error("remote disconnected")),
+            ("stock_zh_a_spot", _raise_named_fetch_error("timeout")),
+        )
+    )
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    with pytest.raises(ProviderError) as exc_info:
+        adapter.fetch_market_snapshot(snapshot_time)
+
+    message = str(exc_info.value)
+    assert "stock_zh_a_spot_em: remote disconnected" in message
+    assert "stock_zh_a_spot: timeout" in message
+
+
+def test_akshare_adapter_errors_when_no_spot_fetcher_is_available() -> None:
+    adapter = AkshareAdapter(spot_fetchers=())
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    with pytest.raises(ProviderError) as exc_info:
+        adapter.fetch_market_snapshot(snapshot_time)
+
+    assert "no AKShare market spot fetchers are available" in str(exc_info.value)
+    assert exc_info.value.retryable is False
+
+
 class FakeFrame:
     def __init__(self, records: list[dict[str, object]]) -> None:
         self.records = records
@@ -108,3 +167,18 @@ class FakeFrame:
 
 def _raise_fetch_error() -> object:
     raise RuntimeError("upstream unavailable")
+
+
+def _tracked_failure(message: str, calls: list[str], label: str) -> Callable[[], object]:
+    def _raise() -> object:
+        calls.append(label)
+        raise RuntimeError(message)
+
+    return _raise
+
+
+def _raise_named_fetch_error(message: str) -> Callable[[], object]:
+    def _raise() -> object:
+        raise RuntimeError(message)
+
+    return _raise

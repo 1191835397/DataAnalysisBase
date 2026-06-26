@@ -35,6 +35,7 @@
 | 最近 market run 状态 | CLI/API 测试 + 手动验证 | `passed` | `dab status --json` 返回 `last_market_run` 和失败原因 |
 | provider retry wrapper | 单元测试 | `passed` | 只重试 `retryable=True` 的 `ProviderError`，使用指数退避 |
 | provider rate limit wrapper | 单元测试 | `passed` | 按 `requests_per_minute` 控制单进程最小间隔 |
+| AKShare 备用现货接口 | 单元测试 | `passed` | `stock_zh_a_spot_em` 失败后 fallback 到 `stock_zh_a_spot`，不联网 |
 
 ## 4. 边界场景
 
@@ -46,12 +47,12 @@
 ## 5. 已知问题
 
 - 真实 AKShare 请求已到达上游，但 Eastmoney 远端返回 `RemoteDisconnected`，尚未取得成功快照
-- 当前已有指数退避和单进程固定间隔限流，还没有备用接口
+- 当前已有指数退避、单进程固定间隔限流和 AKShare 备用现货接口，但尚未完成真实成功快照验证
 
 ## 6. 剩余风险
 
-- 免费源真实请求可能被上游断开，指数退避仍可能失败，需要备用接口策略
+- 免费源真实请求可能被上游断开，指数退避与备用接口仍可能失败，需要以真实执行结果确认
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper 与失败 run 持久化验证标准；Phase A 完整交付仍需完成上游断连备用接口策略，并取得一次成功真实快照。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口与失败 run 持久化验证标准；Phase A 完整交付仍需取得一次成功真实快照。

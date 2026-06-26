@@ -53,10 +53,7 @@
 - provider 联网健康检查已通过显式 `--online` / `online=true` 接入 `dab doctor`、`dab status` 与 `/api/v1/system/status`
 - 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
 - provider 指数退避 retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
-
-### 进行中
-
-- 上游断连后的备用接口策略
+- `AkshareAdapter` 已按 `stock_zh_a_spot_em` -> `stock_zh_a_spot` 顺序提供现货快照备用接口策略
 
 ### 未开始
 
@@ -85,6 +82,5 @@
 
 ## 10. 下一步动作
 
-1. 补备用接口策略
-2. 在可联网环境取得一次成功 AKShare 全市场快照
-3. 接 API / 前端读取真实快照聚合结果
+1. 在可联网环境取得一次成功 AKShare 全市场快照
+2. 接 API / 前端读取真实快照聚合结果

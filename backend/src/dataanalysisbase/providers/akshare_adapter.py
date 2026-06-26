@@ -20,8 +20,13 @@ class AkshareAdapter:
 
     name = "akshare"
 
-    def __init__(self, spot_fetcher: Callable[[], Any] | None = None) -> None:
+    def __init__(
+        self,
+        spot_fetcher: Callable[[], Any] | None = None,
+        spot_fetchers: tuple[tuple[str, Callable[[], Any]], ...] | None = None,
+    ) -> None:
         self._spot_fetcher = spot_fetcher
+        self._spot_fetchers = spot_fetchers
 
     def fetch_market_snapshot(self, snapshot_time: datetime) -> MarketSnapshotBatch:
         """Fetch a whole-market spot snapshot and normalize it."""
@@ -45,6 +50,8 @@ class AkshareAdapter:
     def _fetch_spot_frame(self) -> Any:
         if self._spot_fetcher is not None:
             return self._spot_fetcher()
+        if self._spot_fetchers is not None:
+            return _fetch_first_available(self._spot_fetchers)
 
         try:
             ak = importlib.import_module("akshare")
@@ -55,7 +62,34 @@ class AkshareAdapter:
                 "akshare is not installed; install backend providers extra",
                 retryable=False,
             ) from exc
-        return ak.stock_zh_a_spot_em()
+        fetchers = tuple(
+            (name, fetcher)
+            for name in ("stock_zh_a_spot_em", "stock_zh_a_spot")
+            if callable(fetcher := getattr(ak, name, None))
+        )
+        return _fetch_first_available(fetchers)
+
+
+def _fetch_first_available(fetchers: tuple[tuple[str, Callable[[], Any]], ...]) -> Any:
+    if not fetchers:
+        raise ProviderError(
+            "akshare",
+            MARKET_SPOT_DATASET,
+            "no AKShare market spot fetchers are available",
+            retryable=False,
+        )
+
+    errors: list[str] = []
+    for name, fetcher in fetchers:
+        try:
+            return fetcher()
+        except Exception as exc:
+            errors.append(f"{name}: {_single_line(str(exc))}")
+    raise ProviderError(
+        "akshare",
+        MARKET_SPOT_DATASET,
+        f"all AKShare market spot fetchers failed: {'; '.join(errors)}",
+    )
 
 
 def _records_from_frame(frame: Any) -> list[Mapping[str, Any]]:
@@ -138,3 +172,7 @@ def _first_present(record: Mapping[str, Any], names: tuple[str, ...]) -> Any | N
         if name in record:
             return record[name]
     return None
+
+
+def _single_line(message: str) -> str:
+    return " ".join(message.split())
