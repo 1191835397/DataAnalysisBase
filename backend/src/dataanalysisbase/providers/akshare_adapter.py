@@ -24,9 +24,13 @@ class AkshareAdapter:
         self,
         spot_fetcher: Callable[[], Any] | None = None,
         spot_fetchers: tuple[tuple[str, Callable[[], Any]], ...] | None = None,
+        industry_name_fetcher: Callable[[], Any] | None = None,
+        industry_cons_fetcher: Callable[[str], Any] | None = None,
     ) -> None:
         self._spot_fetcher = spot_fetcher
         self._spot_fetchers = spot_fetchers
+        self._industry_name_fetcher = industry_name_fetcher
+        self._industry_cons_fetcher = industry_cons_fetcher
 
     def fetch_market_snapshot(self, snapshot_time: datetime) -> MarketSnapshotBatch:
         """Fetch a whole-market spot snapshot and normalize it."""
@@ -34,7 +38,11 @@ class AkshareAdapter:
         try:
             frame = self._fetch_spot_frame()
             records = _records_from_frame(frame)
-            rows = [_row_from_record(record, snapshot_time) for record in records]
+            industry_by_code = self._fetch_industry_by_code()
+            rows = [
+                _row_from_record(record, snapshot_time, industry_by_code=industry_by_code)
+                for record in records
+            ]
         except ProviderError:
             raise
         except Exception as exc:
@@ -68,6 +76,54 @@ class AkshareAdapter:
             if callable(fetcher := getattr(ak, name, None))
         )
         return _fetch_first_available(fetchers)
+
+    def _fetch_industry_by_code(self) -> dict[str, str]:
+        name_fetcher, cons_fetcher = self._industry_fetchers()
+        if name_fetcher is None or cons_fetcher is None:
+            return {}
+
+        try:
+            industry_records = _records_from_frame(name_fetcher())
+        except Exception:
+            return {}
+
+        industry_by_code: dict[str, str] = {}
+        for industry_record in industry_records:
+            industry_name = _string_value(
+                industry_record,
+                "板块名称",
+                "行业",
+                "industry_name",
+                "name",
+            )
+            if industry_name is None:
+                continue
+            try:
+                cons_records = _records_from_frame(cons_fetcher(industry_name))
+            except Exception:
+                continue
+            for cons_record in cons_records:
+                security_id = _security_id_from_record(cons_record)
+                if security_id is not None:
+                    industry_by_code[security_id] = industry_name
+        return industry_by_code
+
+    def _industry_fetchers(self) -> tuple[Callable[[], Any] | None, Callable[[str], Any] | None]:
+        if self._industry_name_fetcher is not None and self._industry_cons_fetcher is not None:
+            return self._industry_name_fetcher, self._industry_cons_fetcher
+        if self._spot_fetcher is not None or self._spot_fetchers is not None:
+            return None, None
+
+        try:
+            ak = importlib.import_module("akshare")
+        except ImportError:
+            return None, None
+
+        name_fetcher = getattr(ak, "stock_board_industry_name_em", None)
+        cons_fetcher = getattr(ak, "stock_board_industry_cons_em", None)
+        if not callable(name_fetcher) or not callable(cons_fetcher):
+            return None, None
+        return name_fetcher, cons_fetcher
 
 
 def _fetch_first_available(fetchers: tuple[tuple[str, Callable[[], Any]], ...]) -> Any:
@@ -105,7 +161,12 @@ def _records_from_frame(frame: Any) -> list[Mapping[str, Any]]:
     raise TypeError(msg)
 
 
-def _row_from_record(record: Mapping[str, Any], snapshot_time: datetime) -> MarketRow:
+def _row_from_record(
+    record: Mapping[str, Any],
+    snapshot_time: datetime,
+    *,
+    industry_by_code: Mapping[str, str],
+) -> MarketRow:
     raw_code = _string_value(record, "代码", "code", "symbol")
     raw_name = _string_value(record, "名称", "name")
     if raw_code is None or raw_name is None:
@@ -141,8 +202,19 @@ def _row_from_record(record: Mapping[str, Any], snapshot_time: datetime) -> Mark
         pe_ttm=_float_value(record, "市盈率-动态", "pe_ttm"),
         pb=_float_value(record, "市净率", "pb"),
         market_cap=_float_value(record, "总市值", "market_cap"),
-        industry_code=_string_value(record, "行业", "industry", "industry_code"),
+        industry_code=_string_value(record, "行业", "industry", "industry_code")
+        or industry_by_code.get(security_id),
     )
+
+
+def _security_id_from_record(record: Mapping[str, Any]) -> str | None:
+    raw_code = _string_value(record, "代码", "code", "symbol")
+    if raw_code is None:
+        return None
+    try:
+        return str(SecurityId.parse(raw_code))
+    except InvalidSecurityId:
+        return None
 
 
 def _string_value(record: Mapping[str, Any], *names: str) -> str | None:

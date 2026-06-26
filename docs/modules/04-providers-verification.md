@@ -36,6 +36,8 @@
 | provider retry wrapper | 单元测试 | `passed` | 只重试 `retryable=True` 的 `ProviderError`，使用指数退避 |
 | provider rate limit wrapper | 单元测试 | `passed` | 按 `requests_per_minute` 控制单进程最小间隔 |
 | AKShare 备用现货接口 | 单元测试 | `passed` | `stock_zh_a_spot_em` 失败后 fallback 到 `stock_zh_a_spot`，不联网 |
+| AKShare 行业字段补全 | 单元测试 | `passed` | mock 行业板块和成分股接口；行业接口失败时不阻断快照 |
+| 真实 AKShare 行业接口 | 手动验证 | `blocked` | `stock_board_industry_name_em` 当前返回 `RemoteDisconnected` |
 
 ## 4. 边界场景
 
@@ -47,11 +49,13 @@
 ## 5. 已知问题
 
 - 免费源仍可能因上游策略、接口变更或网络权限失败，需要保留失败 run 与 status 诊断
+- 行业补全已具备降级实现，但真实行业接口当前不可用，真实同步仍可能继续产生 `UNKNOWN` 行业
 
 ## 6. 剩余风险
 
 - AKShare/Eastmoney 免费接口稳定性不可保证，后续仍需观察失败率并评估 Tushare / 其他源补充
+- 行业分类需要备用源，否则行业页数据质量依赖单个 AKShare 行业接口
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。`dab status --online --json` 已返回 `data_status=fresh` 和最近成功 market run。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。行业字段补全已通过 mock 测试，但真实行业接口当前阻塞，需后续验证或接入备用源。

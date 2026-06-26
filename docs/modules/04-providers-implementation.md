@@ -54,6 +54,7 @@
 - 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
 - provider 指数退避 retry 与单进程最小间隔限流已按 `providers.yaml` 接入 `ProviderRegistry`
 - `AkshareAdapter` 已按 `stock_zh_a_spot_em` -> `stock_zh_a_spot` 顺序提供现货快照备用接口策略
+- `AkshareAdapter` 已支持用 `stock_board_industry_name_em` + `stock_board_industry_cons_em` 补全缺失行业字段，行业接口失败时降级保留快照
 - 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
@@ -76,8 +77,9 @@
 
 - AKShare 上游页面变动会导致接口失效
 - 免费源字段格式偶发变化，需要规范化层兜底
+- AKShare 行业板块接口当前真实请求出现 `RemoteDisconnected`，行业补全真实效果待下次可联网验证
 
 ## 10. 下一步动作
 
-1. 前端接入 `/api/v1/market/overview` 与 `/api/v1/stocks`
-2. 后端补 `/api/v1/industries` 与行业成分股接口
+1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
+2. 评估 Tushare / CNInfo 行业分类作为备用源

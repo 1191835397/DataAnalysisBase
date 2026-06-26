@@ -128,6 +128,51 @@ def test_akshare_adapter_falls_back_to_secondary_spot_fetcher() -> None:
     assert batch.rows[0].price == 1688.0
 
 
+def test_akshare_adapter_enriches_missing_industry_from_board_cons() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                }
+            ]
+        ),
+        industry_name_fetcher=lambda: FakeFrame([{"板块名称": "白酒"}]),
+        industry_cons_fetcher=lambda symbol: FakeFrame(
+            [{"代码": "600519", "名称": "贵州茅台"}] if symbol == "白酒" else []
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].industry_code == "白酒"
+
+
+def test_akshare_adapter_keeps_snapshot_when_industry_fetch_fails() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                }
+            ]
+        ),
+        industry_name_fetcher=_raise_fetch_error,
+        industry_cons_fetcher=lambda _symbol: FakeFrame([]),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].industry_code is None
+
+
 def test_akshare_adapter_reports_all_spot_fetcher_failures() -> None:
     adapter = AkshareAdapter(
         spot_fetchers=(
