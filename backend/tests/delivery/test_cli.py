@@ -16,6 +16,7 @@ def test_status_json_outputs_machine_readable_payload(capsys) -> None:
     assert payload["service"] == "dataanalysisbase"
     assert "data_status" in payload
     assert "providers" in payload
+    assert "last_market_run" in payload
 
 
 def test_config_validate_json_succeeds(capsys) -> None:

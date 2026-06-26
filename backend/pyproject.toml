@@ -53,6 +53,24 @@ python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 mypy_path = "src"
+exclude = ["^\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = [
+    "akshare",
+    "akshare.*",
+    "duckdb",
+    "duckdb.*",
+    "_duckdb",
+    "_duckdb.*",
+    "numpy",
+    "numpy.*",
+    "pandas",
+    "pandas.*",
+    "tushare",
+    "tushare.*",
+]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

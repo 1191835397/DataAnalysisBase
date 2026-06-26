@@ -30,6 +30,8 @@
 | `dab sync market` 默认 dry-run | 单元测试 | `passed` | 不调用 provider，不写 DuckDB |
 | provider 本地健康检查 | 单元测试 | `passed` | 覆盖依赖存在、token 缺失、禁用 provider、未知 provider |
 | `/api/v1/system/status` provider health | API 测试 | `passed` | 返回 `providers` 列表 |
+| 真实 `dab sync market --execute` | 手动验证 | `blocked` | AKShare/Eastmoney 远端断开连接；失败 run 已落库 |
+| 最近 market run 状态 | CLI/API 测试 + 手动验证 | `passed` | `dab status --json` 返回 `last_market_run` 和失败原因 |
 
 ## 4. 边界场景
 
@@ -40,14 +42,14 @@
 
 ## 5. 已知问题
 
-- 尚未进行真实 AKShare 联网手动验证
+- 真实 AKShare 请求已到达上游，但 Eastmoney 远端返回 `RemoteDisconnected`，尚未取得成功快照
 - 联网健康检查尚未实现
 - 限流策略尚未实现
 
 ## 6. 剩余风险
 
-- 即使测试通过，真实市场时段仍需观察源稳定性
+- 免费源真实请求可能被上游断开，需要限流、重试退避或备用接口策略
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口和本地 provider health 单元验证标准；Phase A 完整交付仍需完成限流、联网健康检查与真实联网手动验证。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health 与失败 run 持久化验证标准；Phase A 完整交付仍需完成限流、联网健康检查，并取得一次成功真实快照。

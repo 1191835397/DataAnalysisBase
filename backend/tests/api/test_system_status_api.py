@@ -14,3 +14,4 @@ def test_system_status_endpoint_returns_runtime_status() -> None:
     assert "data_status" in payload
     assert "generated_at" in payload
     assert "providers" in payload
+    assert "last_market_run" in payload

@@ -1,13 +1,15 @@
+from datetime import datetime
 from pathlib import Path
 
 from dataanalysisbase.config_loader.settings import Settings
-from dataanalysisbase.domain.enums import DataStatus
+from dataanalysisbase.domain.enums import DataStatus, RunStatus
 from dataanalysisbase.observability.system_status import (
     build_runtime_status,
     has_errors,
     run_doctor,
     validate_config,
 )
+from dataanalysisbase.storage import DuckDBStore, SnapshotRepo
 
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
 
@@ -55,3 +57,29 @@ def test_runtime_status_is_offline_when_database_is_missing(tmp_path: Path) -> N
     assert status.data_status == DataStatus.OFFLINE
     assert status.latest_snapshot_time is None
     assert any(provider.name == "akshare" for provider in status.providers)
+
+
+def test_runtime_status_reports_failed_last_market_run(tmp_path: Path) -> None:
+    db_path = tmp_path / "data" / "analytics.duckdb"
+    store = DuckDBStore(db_path)
+    store.init_schema()
+    repo = SnapshotRepo(store)
+    snapshot_time = datetime(2026, 6, 26, 9, 30)
+    repo.begin_run(snapshot_time=snapshot_time, source="akshare", expected=0)
+    repo.commit_run(
+        snapshot_time=snapshot_time,
+        source="akshare",
+        status=RunStatus.FAILED,
+        actual=0,
+        missing=0,
+        error="remote disconnected",
+    )
+    store.close()
+    settings = Settings(config_dir=ROOT_CONFIG, data_dir=tmp_path / "data", duckdb_path=db_path)
+
+    status = build_runtime_status(settings)
+
+    assert status.data_status == DataStatus.FAILED
+    assert status.last_market_run is not None
+    assert status.last_market_run.status == "failed"
+    assert status.last_market_run.error == "remote disconnected"

@@ -23,6 +23,10 @@ def test_snapshot_write_is_idempotent(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0].security_id == "600519.SH"
     assert repo.latest_committed() == t
+    latest_run = repo.latest_run()
+    assert latest_run is not None
+    assert latest_run["status"] == RunStatus.SUCCESS.value
+    assert latest_run["actual"] == 1
 
 
 def test_aggregate_repo_refreshes_overview_and_stock_page(tmp_path: Path) -> None:

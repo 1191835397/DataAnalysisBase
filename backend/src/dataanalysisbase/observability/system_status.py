@@ -47,6 +47,22 @@ class CheckResult(BaseModel):
     message: str
 
 
+class MarketRunStatus(BaseModel):
+    """Latest whole-market snapshot run status."""
+
+    model_config = ConfigDict(frozen=True)
+
+    snapshot_time: datetime
+    source: str
+    status: str
+    expected: int
+    actual: int
+    missing: int
+    error: str | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+
+
 class RuntimeStatus(BaseModel):
     """Current local runtime status for CLI and API consumers."""
 
@@ -60,6 +76,7 @@ class RuntimeStatus(BaseModel):
     duckdb_path: str
     config_dir: str
     providers: list[ProviderHealth]
+    last_market_run: MarketRunStatus | None = None
 
 
 def validate_config(config_dir: Path | None = None) -> list[CheckResult]:
@@ -100,16 +117,18 @@ def build_runtime_status(settings: Settings | None = None) -> RuntimeStatus:
     """Build a compact system status snapshot without mutating runtime state."""
 
     settings = settings or load_settings()
-    latest_snapshot_time = _latest_snapshot_time(settings.duckdb_path)
+    snapshot_state = _snapshot_state(settings.duckdb_path)
+    latest_snapshot_time = snapshot_state.latest_snapshot_time
     providers = _provider_health(settings.config_dir)
     return RuntimeStatus(
         generated_at=datetime.now(UTC),
         run_mode=settings.run_mode,
-        data_status=_data_status(latest_snapshot_time),
+        data_status=_data_status(latest_snapshot_time, snapshot_state.last_market_run),
         latest_snapshot_time=latest_snapshot_time,
         duckdb_path=str(settings.duckdb_path),
         config_dir=str(settings.config_dir),
         providers=providers,
+        last_market_run=snapshot_state.last_market_run,
     )
 
 
@@ -180,20 +199,40 @@ def _provider_health(config_dir: Path) -> list[ProviderHealth]:
     return build_provider_health(providers)
 
 
-def _latest_snapshot_time(path: Path) -> datetime | None:
+class _SnapshotState(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    latest_snapshot_time: datetime | None = None
+    last_market_run: MarketRunStatus | None = None
+
+
+def _snapshot_state(path: Path) -> _SnapshotState:
     if not path.exists():
-        return None
+        return _SnapshotState()
 
     try:
         store = DuckDBStore(path, read_only=True)
-        latest = SnapshotRepo(store).latest_committed()
+        repo = SnapshotRepo(store)
+        latest = repo.latest_committed()
+        latest_run = _market_run_status(repo.latest_run())
         store.close()
     except StorageError:
+        return _SnapshotState()
+    return _SnapshotState(latest_snapshot_time=latest, last_market_run=latest_run)
+
+
+def _market_run_status(row: dict[str, object] | None) -> MarketRunStatus | None:
+    if row is None:
         return None
-    return latest
+    return MarketRunStatus.model_validate(row)
 
 
-def _data_status(latest_snapshot_time: datetime | None) -> DataStatus:
+def _data_status(
+    latest_snapshot_time: datetime | None,
+    last_market_run: MarketRunStatus | None,
+) -> DataStatus:
+    if latest_snapshot_time is None and last_market_run is not None:
+        return DataStatus.FAILED if last_market_run.status == "failed" else DataStatus.OFFLINE
     if latest_snapshot_time is None:
         return DataStatus.OFFLINE
     return DataStatus.FRESH

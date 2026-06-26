@@ -50,6 +50,7 @@
 - `MarketBulkSync` 已可消费 provider batch 并刷新聚合表
 - `dab sync market` 已提供默认 dry-run 与显式 `--execute` 手动执行入口
 - provider 本地健康检查已接入 `dab doctor` 与 `/api/v1/system/status`
+- 最近一次 market sync run 已接入 `dab status --json` 与 `/api/v1/system/status`
 
 ### 进行中
 
@@ -58,7 +59,7 @@
 ### 未开始
 
 - 联网健康检查
-- 真实 AKShare 联网手动验证
+- 成功真实 AKShare 快照验证
 
 ## 6. 关键决策
 
@@ -84,5 +85,5 @@
 ## 10. 下一步动作
 
 1. 补 provider 限流策略
-2. 在可联网环境手动验证 AKShare 全市场快照
+2. 在可联网环境取得一次成功 AKShare 全市场快照
 3. 接 API / 前端读取真实快照聚合结果

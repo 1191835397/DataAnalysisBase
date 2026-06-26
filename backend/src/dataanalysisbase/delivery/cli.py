@@ -99,6 +99,9 @@ def _status(args: argparse.Namespace) -> int:
         print(f"latest_snapshot_time: {status.latest_snapshot_time or 'none'}")
         print(f"duckdb_path: {status.duckdb_path}")
         print(f"config_dir: {status.config_dir}")
+        if status.last_market_run is not None:
+            print(f"last_market_run_status: {status.last_market_run.status}")
+            print(f"last_market_run_time: {status.last_market_run.snapshot_time}")
     return 0
 
 

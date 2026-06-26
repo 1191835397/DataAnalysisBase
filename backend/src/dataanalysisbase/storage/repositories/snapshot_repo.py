@@ -94,6 +94,18 @@ class SnapshotRepo(BaseRepo):
         )
         return rows[0]["snapshot_time"] if rows else None
 
+    def latest_run(self) -> dict[str, Any] | None:
+        rows = self.store.query(
+            """
+            SELECT snapshot_time, source, status, expected, actual, missing,
+                   error, started_at, finished_at
+            FROM market_snapshot_runs
+            ORDER BY started_at DESC
+            LIMIT 1
+            """
+        )
+        return rows[0] if rows else None
+
     def get_snapshot(self, snapshot_time: datetime) -> list[MarketRow]:
         rows = self.store.query(
             """
