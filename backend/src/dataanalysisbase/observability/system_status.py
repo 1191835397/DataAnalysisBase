@@ -261,6 +261,8 @@ def _industry_mapping_check(provider_name: str, path: Path) -> CheckResult:
         records = load_industry_mapping_file(path)
     except Exception as exc:
         return CheckResult(name=name, status="error", message=_single_line(str(exc)))
+    if not records:
+        return CheckResult(name=name, status="warning", message=f"0 records: {path}")
     return CheckResult(name=name, status="ok", message=f"{len(records)} records: {path}")
 
 

@@ -74,6 +74,26 @@ def test_doctor_reports_industry_mapping_file_record_count(tmp_path: Path) -> No
     )
 
 
+def test_doctor_warns_when_industry_mapping_file_is_empty(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "industry_mapping.csv").write_text("security_id,industry\n", encoding="utf-8")
+    settings = Settings(
+        config_dir=ROOT_CONFIG,
+        data_dir=data_dir,
+        duckdb_path=data_dir / "analytics.duckdb",
+    )
+
+    results = run_doctor(settings)
+
+    assert any(
+        result.name == "industry_mapping:akshare"
+        and result.status == "warning"
+        and result.message.startswith("0 records:")
+        for result in results
+    )
+
+
 def test_doctor_can_include_online_provider_connectivity(
     monkeypatch,
     tmp_path: Path,

@@ -59,6 +59,14 @@ def run_industry_mapping_sync(
 
     try:
         mapping = selected_provider.fetch_industry_mapping()
+        if not mapping:
+            return IndustryMappingSyncResult(
+                status="failed",
+                source=selected_provider.name,
+                path=str(target_path),
+                records=0,
+                errors=["provider returned 0 industry mapping records"],
+            )
         records = write_industry_mapping_csv(target_path, mapping)
     except Exception as exc:
         return IndustryMappingSyncResult(

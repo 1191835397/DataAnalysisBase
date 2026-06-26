@@ -83,6 +83,24 @@ def test_run_industry_mapping_sync_writes_mapping_file(tmp_path: Path, monkeypat
     )
 
 
+def test_run_industry_mapping_sync_fails_on_empty_mapping(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.load_settings",
+        lambda: Settings(config_dir=ROOT_CONFIG, data_dir=data_dir),
+    )
+
+    result = run_industry_mapping_sync(
+        config_dir=ROOT_CONFIG,
+        provider=MockIndustryMappingProvider({}),
+    )
+
+    assert result.status == "failed"
+    assert result.records == 0
+    assert result.errors == ["provider returned 0 industry mapping records"]
+    assert not (data_dir / "industry_mapping.csv").exists()
+
+
 class MockProvider:
     name = "mock"
 
