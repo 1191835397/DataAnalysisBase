@@ -51,14 +51,17 @@
 - 前端页面设计与交互约束已完成
 - 已初始化 `frontend/` Vite + React + TypeScript 工程骨架
 - 已创建 Phase A 占位仪表盘、Vite proxy、基础样式
+- 已安装 npm 依赖并生成 `package-lock.json`
+- 已用 `/api/v1/system/status`、`/api/v1/market/overview`、`/api/v1/stocks` 替换市场总览和股票列表占位数据
+- `npm.cmd run build` 已通过
 
 ### 进行中
 
-- 等待安装 npm 依赖后进行构建验证
+- 前端页面与本地后端 dev server 联调
 
 ### 未开始
 
-- 联调与测试
+- 行业页真实 API 接入
 
 ## 6. 关键决策
 
@@ -83,6 +86,6 @@
 
 ## 10. 下一步动作
 
-1. 安装 npm 依赖并完成构建验证
-2. 用 `/api/v1/market/overview` 替换市场总览占位数据
-3. 用 `/api/v1/stocks` 替换股票列表占位数据
+1. 启动后端 API 与 Vite dev server 做浏览器联调
+2. 补 `/api/v1/industries` 后接行业页真实数据
+3. 拆分 `main.tsx` 中的页面、API client 和格式化工具

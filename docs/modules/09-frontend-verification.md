@@ -3,7 +3,7 @@
 | 属性 | 值 |
 |------|-----|
 | 模块 | `frontend` |
-| 验证状态 | `not_started` |
+| 验证状态 | `partial` |
 | 最近更新 | `2026-06-22` |
 | 关联实现 | [09-frontend-implementation.md](./09-frontend-implementation.md) |
 
@@ -23,11 +23,12 @@
 
 | 项 | 方法 | 结果 | 备注 |
 |----|------|------|------|
-| 首页渲染市场总览 | 集成测试 | `not_started` |  |
+| 首页渲染市场总览 | 构建 + HTTP 联通 | `partial` | 已接 `/api/v1/market/overview`，Vite 入口返回 200；浏览器截图待补 |
 | 行业页渲染热力图/列表 | 集成测试 | `not_started` |  |
-| 股票页分页排序有效 | 集成测试 | `not_started` |  |
-| `data_status` 顶栏显示正确 | 单元测试 | `not_started` |  |
-| stale/failed 不白屏 | 手动验证 | `not_started` |  |
+| 股票页分页排序有效 | 构建 + HTTP 联通 | `partial` | 已接 `/api/v1/stocks?filter=gainers&size=12`；浏览器交互待补 |
+| `data_status` 顶栏显示正确 | 构建验证 | `partial` | 已接 `/api/v1/system/status` 并显示状态 pill |
+| stale/failed 不白屏 | 代码检查 | `partial` | 已有 loading/error notice，待浏览器验证 |
+| 前端生产构建 | 本地命令 | `passed` | `npm.cmd run build` |
 
 ## 4. 边界场景
 
@@ -38,12 +39,14 @@
 
 ## 5. 已知问题
 
-- 尚未开始实现与验证
+- 浏览器控制插件当前初始化失败，尚未完成截图和视觉回归验证
+- 行业页真实 API 尚未实现
 
 ## 6. 剩余风险
 
 - 前端性能是否满足大列表浏览，需在真实数据量下验证
+- 当前股票列表先取涨幅居前 12 条；完整服务端分页控件尚未实现
 
 ## 7. 验收结论
 
-当前未达到交付标准；需完成三页实现与联调验证。
+当前已完成市场总览和股票列表的真实 API 接入、依赖安装和生产构建验证；完整交付仍需浏览器视觉验证、行业页真实数据和分页控件。

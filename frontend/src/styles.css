@@ -1,7 +1,7 @@
 :root {
-  color: #17211b;
-  background: #e8eee7;
-  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  color: #18221c;
+  background: #edf1ea;
+  font-family: "Avenir Next", "Gill Sans", "Segoe UI", sans-serif;
 }
 
 * {
@@ -22,9 +22,7 @@ button {
   display: grid;
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
-  background:
-    linear-gradient(135deg, rgba(31, 78, 56, 0.1), transparent 38%),
-    #eef2eb;
+  background: #eef2eb;
 }
 
 .sidebar {
@@ -32,8 +30,8 @@ button {
   flex-direction: column;
   gap: 28px;
   padding: 24px 18px;
-  border-right: 1px solid rgba(23, 33, 27, 0.12);
-  background: rgba(249, 251, 247, 0.74);
+  border-right: 1px solid rgba(24, 34, 28, 0.12);
+  background: #f8faf5;
 }
 
 .brand {
@@ -56,18 +54,19 @@ nav {
   border: 0;
   border-radius: 6px;
   padding: 0 10px;
-  color: #2b382e;
+  color: #2d3a31;
   background: transparent;
   cursor: pointer;
   text-align: left;
 }
 
-.nav-item:first-child {
+.nav-item[aria-current="true"] {
   color: #f7fbf4;
   background: #1f4e38;
 }
 
 .workspace {
+  min-width: 0;
   padding: 32px;
 }
 
@@ -76,7 +75,13 @@ nav {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding-bottom: 28px;
+  padding-bottom: 24px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .eyebrow {
@@ -87,41 +92,93 @@ nav {
   text-transform: uppercase;
 }
 
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.18;
+}
+
 h1 {
   max-width: 720px;
-  margin: 0;
   font-size: 32px;
-  line-height: 1.18;
+}
+
+h2 {
+  font-size: 22px;
 }
 
 .status-pill {
   min-width: 88px;
-  border: 1px solid rgba(23, 33, 27, 0.18);
+  border: 1px solid rgba(24, 34, 28, 0.18);
   border-radius: 999px;
   padding: 7px 12px;
-  color: #6a3e1e;
+  color: #5d3a19;
   background: #fff3d9;
   text-align: center;
   font-size: 13px;
   font-weight: 700;
 }
 
+.status-pill.fresh {
+  color: #f7fbf4;
+  background: #1f4e38;
+}
+
+.status-pill.failed {
+  color: #fff8f7;
+  background: #9b2f2f;
+}
+
+.status-pill.offline,
+.status-pill.stale {
+  color: #5d3a19;
+  background: #fff3d9;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(24, 34, 28, 0.18);
+  border-radius: 6px;
+  color: #213027;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.notice {
+  margin-bottom: 16px;
+  border: 1px solid rgba(24, 34, 28, 0.14);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #44574b;
+  background: #ffffff;
+}
+
+.notice.error {
+  border-color: rgba(155, 47, 47, 0.28);
+  color: #762828;
+  background: #fff7f5;
+}
+
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-panel,
+.table-panel {
+  border: 1px solid rgba(24, 34, 28, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .metric-panel {
-  min-height: 180px;
-  border: 1px solid rgba(23, 33, 27, 0.12);
-  border-radius: 8px;
+  min-height: 154px;
   padding: 18px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.metric-panel.wide {
-  grid-column: 1 / -1;
 }
 
 .metric-panel span {
@@ -135,13 +192,81 @@ h1 {
   display: block;
   margin-bottom: 10px;
   font-size: 28px;
+  line-height: 1.1;
 }
 
 .metric-panel p {
-  max-width: 560px;
   margin: 0;
   color: #4d5f54;
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+.table-panel {
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid rgba(24, 34, 28, 0.1);
+}
+
+.section-heading > span {
+  color: #597064;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(24, 34, 28, 0.08);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: #597064;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+tbody tr:hover {
+  background: rgba(31, 78, 56, 0.06);
+}
+
+.mono {
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.up {
+  color: #a12f2f;
+  font-weight: 700;
+}
+
+.down {
+  color: #1f6d4a;
+  font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -151,7 +276,7 @@ h1 {
 
   .sidebar {
     border-right: 0;
-    border-bottom: 1px solid rgba(23, 33, 27, 0.12);
+    border-bottom: 1px solid rgba(24, 34, 28, 0.12);
   }
 
   nav {
