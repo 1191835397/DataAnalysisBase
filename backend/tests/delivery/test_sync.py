@@ -5,8 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dataanalysisbase.config_loader.settings import Settings
 from dataanalysisbase.delivery.cli import main
-from dataanalysisbase.delivery.sync import run_market_sync
+from dataanalysisbase.delivery.sync import run_industry_mapping_sync, run_market_sync
 from dataanalysisbase.domain.contracts import MarketRow
 from dataanalysisbase.domain.enums import RunStatus
 from dataanalysisbase.providers import MarketSnapshotBatch
@@ -50,6 +51,38 @@ def test_sync_market_defaults_to_dry_run_json(capsys) -> None:
     assert payload["will_write_database"] is False
 
 
+def test_sync_industry_mapping_defaults_to_dry_run_json(capsys) -> None:
+    exit_code = main(["sync", "industry-mapping", "--config-dir", str(ROOT_CONFIG), "--json"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert payload["command"] == "sync-industry-mapping"
+    assert payload["dry_run"] is True
+    assert payload["will_call_provider"] is False
+    assert payload["will_write_file"] is False
+
+
+def test_run_industry_mapping_sync_writes_mapping_file(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.load_settings",
+        lambda: Settings(config_dir=ROOT_CONFIG, data_dir=data_dir),
+    )
+
+    result = run_industry_mapping_sync(
+        config_dir=ROOT_CONFIG,
+        provider=MockIndustryMappingProvider({"600519.SH": "白酒", "300750.SZ": "电池"}),
+    )
+
+    assert result.status == "success"
+    assert result.records == 2
+    assert (data_dir / "industry_mapping.csv").read_text(encoding="utf-8") == (
+        "security_id,industry\n300750.SZ,电池\n600519.SH,白酒\n"
+    )
+
+
 class MockProvider:
     name = "mock"
 
@@ -63,6 +96,16 @@ class MockProvider:
             expected=len(self.rows),
             rows=self.rows,
         )
+
+
+class MockIndustryMappingProvider:
+    name = "mock"
+
+    def __init__(self, mapping: dict[str, str]) -> None:
+        self.mapping = mapping
+
+    def fetch_industry_mapping(self) -> dict[str, str]:
+        return self.mapping
 
 
 def _row(snapshot_time: datetime, security_id: str) -> MarketRow:

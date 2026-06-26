@@ -2,7 +2,10 @@ import json
 from pathlib import Path
 
 from dataanalysisbase.delivery.cli import main
-from dataanalysisbase.delivery.plan import build_sync_market_plan
+from dataanalysisbase.delivery.plan import (
+    build_sync_industry_mapping_plan,
+    build_sync_market_plan,
+)
 
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
 
@@ -33,3 +36,16 @@ def test_plan_sync_market_json_outputs_dry_run_payload(capsys) -> None:
     assert payload["selected_provider"]["name"] == "akshare"
     assert payload["will_call_provider"] is False
     assert payload["will_write_database"] is False
+
+
+def test_sync_industry_mapping_plan_targets_configured_mapping_file() -> None:
+    plan = build_sync_industry_mapping_plan(ROOT_CONFIG)
+
+    assert plan.command == "sync-industry-mapping"
+    assert plan.dry_run is True
+    assert plan.provider == "akshare"
+    assert plan.target_file.endswith("data\\industry_mapping.csv") or plan.target_file.endswith(
+        "data/industry_mapping.csv"
+    )
+    assert plan.will_call_provider is False
+    assert plan.will_write_file is False

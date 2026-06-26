@@ -5,6 +5,31 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+from typing import Protocol
+
+from pydantic import BaseModel, ConfigDict
+
+
+class IndustryMappingProvider(Protocol):
+    """Provider protocol for security-to-industry mapping sync."""
+
+    name: str
+
+    def fetch_industry_mapping(self) -> dict[str, str]:
+        """Fetch security-to-industry mapping records."""
+
+
+class IndustryMappingSyncResult(BaseModel):
+    """Result of writing a local industry mapping file."""
+
+    model_config = ConfigDict(frozen=True)
+
+    task: str = "industry_mapping_sync"
+    status: str
+    source: str
+    path: str
+    records: int
+    errors: list[str] = []
 
 
 def load_industry_mapping_file(path: Path) -> list[dict[str, object]]:
@@ -37,3 +62,15 @@ def _load_json(path: Path) -> list[dict[str, object]]:
 
     msg = "Industry mapping JSON must be an object or an array of objects"
     raise ValueError(msg)
+
+
+def write_industry_mapping_csv(path: Path, mapping: dict[str, str]) -> int:
+    """Write a security-to-industry mapping as a stable CSV file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["security_id", "industry"])
+        writer.writeheader()
+        for security_id, industry in sorted(mapping.items()):
+            writer.writerow({"security_id": security_id, "industry": industry})
+    return len(mapping)

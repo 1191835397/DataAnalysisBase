@@ -57,6 +57,14 @@ class AkshareAdapter:
             rows=rows,
         )
 
+    def fetch_industry_mapping(self) -> dict[str, str]:
+        """Fetch security-to-industry mapping from provider-native industry boards."""
+
+        name_fetcher, cons_fetcher = self._industry_fetchers()
+        if name_fetcher is None or cons_fetcher is None:
+            return {}
+        return self._fetch_board_industry_by_code(name_fetcher, cons_fetcher)
+
     def _fetch_spot_frame(self) -> Any:
         if self._spot_fetcher is not None:
             return self._spot_fetcher()
@@ -85,11 +93,20 @@ class AkshareAdapter:
         if name_fetcher is None or cons_fetcher is None:
             return industry_by_code
 
+        industry_by_code.update(self._fetch_board_industry_by_code(name_fetcher, cons_fetcher))
+        return industry_by_code
+
+    def _fetch_board_industry_by_code(
+        self,
+        name_fetcher: Callable[[], Any],
+        cons_fetcher: Callable[[str], Any],
+    ) -> dict[str, str]:
         try:
             industry_records = _records_from_frame(name_fetcher())
         except Exception:
-            return industry_by_code
+            return {}
 
+        industry_by_code: dict[str, str] = {}
         for industry_record in industry_records:
             industry_name = _string_value(
                 industry_record,

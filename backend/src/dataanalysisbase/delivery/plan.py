@@ -53,6 +53,22 @@ class SyncMarketPlan(BaseModel):
     notes: list[str]
 
 
+class SyncIndustryMappingPlan(BaseModel):
+    """Dry-run plan for local industry mapping refresh."""
+
+    model_config = ConfigDict(frozen=True)
+
+    command: str
+    dry_run: bool
+    run_mode: str
+    config_dir: str
+    provider: str
+    target_file: str
+    will_call_provider: bool
+    will_write_file: bool
+    notes: list[str]
+
+
 def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
     """Build a read-only preview for market bulk sync."""
 
@@ -90,5 +106,39 @@ def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
             "dry-run only; no provider request is made",
             "dry-run only; no DuckDB write is performed",
             "real execution should write through MarketBulkSync and storage repositories",
+        ],
+    )
+
+
+def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndustryMappingPlan:
+    """Build a read-only preview for refreshing the local industry mapping file."""
+
+    settings = load_settings()
+    resolved_config_dir = config_dir or settings.config_dir
+    providers = load_providers(resolved_config_dir)
+    akshare = providers.providers.get("akshare")
+    if akshare is None:
+        raise ConfigError("providers.yaml missing provider: akshare")
+    if akshare.industry_mapping_path is None:
+        raise ConfigError("akshare.industry_mapping_path is not configured")
+    target_file = (
+        akshare.industry_mapping_path
+        if akshare.industry_mapping_path.is_absolute()
+        else settings.data_dir / akshare.industry_mapping_path
+    )
+
+    return SyncIndustryMappingPlan(
+        command="sync-industry-mapping",
+        dry_run=True,
+        run_mode=settings.run_mode,
+        config_dir=str(resolved_config_dir),
+        provider="akshare",
+        target_file=str(target_file),
+        will_call_provider=False,
+        will_write_file=False,
+        notes=[
+            "dry-run only; no provider request is made",
+            "dry-run only; no industry mapping file is written",
+            "real execution fetches provider-native industry board membership",
         ],
     )

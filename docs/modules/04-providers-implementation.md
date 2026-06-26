@@ -58,6 +58,7 @@
 - `ProviderRegistry` 已按 `providers.yaml` 的 `industry_mapping_path` 注入本地行业映射文件读取器；路径相对 `data_dir`，默认可放 `data/industry_mapping.csv`
 - `AkshareAdapter` 已预留 `industry_mapping_fetcher` 备用映射入口，可承接后续 Tushare / CNInfo / 本地静态行业映射；映射文件缺失或解析失败时降级保留快照
 - `dab doctor` 已检查 `industry_mapping_path` 文件是否存在、可解析，并返回记录数或明确 warning/error
+- `dab sync industry-mapping` 已提供默认 dry-run；`--execute` 时通过 provider-native 行业板块接口生成本地 `data/industry_mapping.csv`
 - 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
@@ -85,4 +86,4 @@
 ## 10. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
-2. 补充真实 `data/industry_mapping.csv` 或接入 Tushare `stock_basic` 自动生成该映射，再评估 CNInfo
+2. 在 AKShare 行业接口恢复时执行 `dab sync industry-mapping --execute`，生成真实 `data/industry_mapping.csv`

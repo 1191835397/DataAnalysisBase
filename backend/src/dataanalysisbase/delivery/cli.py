@@ -11,8 +11,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from dataanalysisbase.delivery.plan import build_sync_market_plan
-from dataanalysisbase.delivery.sync import run_market_sync
+from dataanalysisbase.delivery.plan import (
+    build_sync_industry_mapping_plan,
+    build_sync_market_plan,
+)
+from dataanalysisbase.delivery.sync import run_industry_mapping_sync, run_market_sync
 from dataanalysisbase.observability.system_status import (
     build_runtime_status,
     has_errors,
@@ -34,8 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         return _status(args)
     if args.command == "plan" and args.plan_command == "sync-market":
         return _plan_sync_market(args)
+    if args.command == "plan" and args.plan_command == "sync-industry-mapping":
+        return _plan_sync_industry_mapping(args)
     if args.command == "sync" and args.sync_command == "market":
         return _sync_market(args)
+    if args.command == "sync" and args.sync_command == "industry-mapping":
+        return _sync_industry_mapping(args)
 
     parser.print_help()
     return 2
@@ -68,6 +75,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     plan_sync_market.add_argument("--config-dir", type=Path, default=None)
     plan_sync_market.add_argument("--json", action="store_true", dest="json_output")
+    plan_sync_industry_mapping = plan_subparsers.add_parser(
+        "sync-industry-mapping",
+        help="Preview local industry mapping refresh",
+    )
+    plan_sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
+    plan_sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
 
     sync_parser = subparsers.add_parser("sync", help="Run manual sync jobs")
     sync_subparsers = sync_parser.add_subparsers(dest="sync_command")
@@ -76,6 +89,13 @@ def _build_parser() -> argparse.ArgumentParser:
     sync_market.add_argument("--snapshot-time", type=_parse_datetime, default=None)
     sync_market.add_argument("--execute", action="store_true")
     sync_market.add_argument("--json", action="store_true", dest="json_output")
+    sync_industry_mapping = sync_subparsers.add_parser(
+        "industry-mapping",
+        help="Refresh local security-to-industry mapping",
+    )
+    sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
+    sync_industry_mapping.add_argument("--execute", action="store_true")
+    sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -131,6 +151,20 @@ def _plan_sync_market(args: argparse.Namespace) -> int:
     return 0
 
 
+def _plan_sync_industry_mapping(args: argparse.Namespace) -> int:
+    plan = build_sync_industry_mapping_plan(args.config_dir)
+    if args.json_output:
+        print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print("plan: sync-industry-mapping")
+        print("dry-run: true")
+        print(f"provider: {plan.provider}")
+        print(f"target_file: {plan.target_file}")
+        print("will_call_provider: false")
+        print("will_write_file: false")
+    return 0
+
+
 def _sync_market(args: argparse.Namespace) -> int:
     if not args.execute:
         plan = build_sync_market_plan(args.config_dir)
@@ -157,6 +191,32 @@ def _sync_market(args: argparse.Namespace) -> int:
         for error in result.errors:
             print(f"error: {error}")
     return 1 if result.status.value == "failed" else 0
+
+
+def _sync_industry_mapping(args: argparse.Namespace) -> int:
+    if not args.execute:
+        plan = build_sync_industry_mapping_plan(args.config_dir)
+        if args.json_output:
+            print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        else:
+            print("dry-run: true")
+            print("pass --execute to call provider and write industry mapping file")
+            print(f"provider: {plan.provider}")
+            print(f"target_file: {plan.target_file}")
+        return 0
+
+    result = run_industry_mapping_sync(config_dir=args.config_dir)
+    if args.json_output:
+        print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"task: {result.task}")
+        print(f"status: {result.status}")
+        print(f"source: {result.source}")
+        print(f"path: {result.path}")
+        print(f"records: {result.records}")
+        for error in result.errors:
+            print(f"error: {error}")
+    return 1 if result.status == "failed" else 0
 
 
 def _emit(results: Sequence[BaseModel], *, json_output: bool) -> None:
