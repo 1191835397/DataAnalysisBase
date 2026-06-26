@@ -65,7 +65,32 @@ def test_aggregate_repo_refreshes_overview_and_stock_page(tmp_path: Path) -> Non
     assert industries[0]["stock_count"] == 2
 
 
-def _row(snapshot_time: datetime, security_id: str, change_pct: float) -> MarketRow:
+def test_stock_query_unknown_industry_matches_null_industry(tmp_path: Path) -> None:
+    store = DuckDBStore(tmp_path / "test.duckdb")
+    store.init_schema()
+    snapshot_repo = SnapshotRepo(store)
+    aggregate_repo = AggregateRepo(store)
+    t = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    snapshot_repo.begin_run(t, "test", expected=1)
+    snapshot_repo.write_snapshot([_row(t, "600519.SH", 1.2, industry_code=None)])
+    snapshot_repo.commit_run(t, "test", RunStatus.SUCCESS, actual=1, missing=0)
+    aggregate_repo.refresh_latest(t)
+
+    page = aggregate_repo.get_stocks_page(StockQuery(industry="UNKNOWN"))
+
+    assert page.total == 1
+    assert page.items[0]["security_id"] == "600519.SH"
+    assert page.items[0]["industry_code"] is None
+
+
+def _row(
+    snapshot_time: datetime,
+    security_id: str,
+    change_pct: float,
+    *,
+    industry_code: str | None = "TEST",
+) -> MarketRow:
     return MarketRow(
         snapshot_time=snapshot_time,
         security_id=security_id,
@@ -78,7 +103,7 @@ def _row(snapshot_time: datetime, security_id: str, change_pct: float) -> Market
         pe_ttm=20,
         pb=3,
         market_cap=1000000,
-        industry_code="TEST",
+        industry_code=industry_code,
         source="test",
         fetched_at=snapshot_time,
     )

@@ -77,6 +77,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeView, setActiveView] = useState<ActiveView>("overview");
+  const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null);
+  const [industryStocks, setIndustryStocks] = useState<Page<StockItem> | null>(null);
+  const [isIndustryLoading, setIsIndustryLoading] = useState(false);
+  const [industryError, setIndustryError] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -104,6 +108,40 @@ function App() {
       isActive = false;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!selectedIndustry) {
+      setIndustryStocks(null);
+      return;
+    }
+
+    let isActive = true;
+    setIsIndustryLoading(true);
+    setIndustryError(null);
+
+    fetchJson<Page<StockItem>>(
+      `/api/v1/industries/${encodeURIComponent(selectedIndustry)}/stocks?size=12`
+    )
+      .then((nextPage) => {
+        if (isActive) {
+          setIndustryStocks(nextPage);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (isActive) {
+          setIndustryError(reason instanceof Error ? reason.message : "行业成分股加载失败");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsIndustryLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedIndustry, refreshKey]);
 
   const breadth = useMemo(() => {
     if (!data?.overview.stock_count) {
@@ -189,47 +227,74 @@ function App() {
         ) : null}
 
         {data && activeView === "industries" ? (
-          <section className="table-panel" aria-label="行业排行">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">行业排行</p>
-                <h2>均涨幅居前</h2>
+          <>
+            <section className="table-panel" aria-label="行业排行">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">行业排行</p>
+                  <h2>均涨幅居前</h2>
+                </div>
+                <span>{formatInteger(data.industries.length)} 个行业</span>
               </div>
-              <span>{formatInteger(data.industries.length)} 个行业</span>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>行业</th>
-                    <th>成分股</th>
-                    <th>均涨幅</th>
-                    <th>上涨</th>
-                    <th>下跌</th>
-                    <th>成交额</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.industries.map((industry) => (
-                    <tr key={industry.industry_code}>
-                      <td>{industry.industry_code}</td>
-                      <td>{formatInteger(industry.stock_count)}</td>
-                      <td
-                        className={
-                          industry.change_pct_avg && industry.change_pct_avg > 0 ? "up" : "down"
-                        }
-                      >
-                        {formatSignedPercent(industry.change_pct_avg)}
-                      </td>
-                      <td>{formatInteger(industry.up_count)}</td>
-                      <td>{formatInteger(industry.down_count)}</td>
-                      <td>{formatAmount(industry.amount_sum)}</td>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>行业</th>
+                      <th>成分股</th>
+                      <th>均涨幅</th>
+                      <th>上涨</th>
+                      <th>下跌</th>
+                      <th>成交额</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  </thead>
+                  <tbody>
+                    {data.industries.map((industry) => (
+                      <tr
+                        className="clickable-row"
+                        key={industry.industry_code}
+                        onClick={() => setSelectedIndustry(industry.industry_code)}
+                      >
+                        <td>{industry.industry_code}</td>
+                        <td>{formatInteger(industry.stock_count)}</td>
+                        <td
+                          className={
+                            industry.change_pct_avg && industry.change_pct_avg > 0 ? "up" : "down"
+                          }
+                        >
+                          {formatSignedPercent(industry.change_pct_avg)}
+                        </td>
+                        <td>{formatInteger(industry.up_count)}</td>
+                        <td>{formatInteger(industry.down_count)}</td>
+                        <td>{formatAmount(industry.amount_sum)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {selectedIndustry ? (
+              <section className="table-panel" aria-label="行业成分股">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">行业成分股</p>
+                    <h2>{selectedIndustry}</h2>
+                  </div>
+                  <span>{industryStocks ? `${formatInteger(industryStocks.total)} 只` : "加载中"}</span>
+                </div>
+                {industryError ? <div className="inline-notice error">{industryError}</div> : null}
+                {isIndustryLoading ? <div className="inline-notice">加载行业成分股...</div> : null}
+                {industryStocks ? <StockTable stocks={industryStocks.items} /> : null}
+              </section>
+            ) : (
+              <section className="empty-panel">
+                <p className="eyebrow">行业成分股</p>
+                <h2>选择一个行业查看成分股</h2>
+                <p>当前真实快照缺少行业分类时，系统会把空行业聚合到 UNKNOWN。</p>
+              </section>
+            )}
+          </>
         ) : null}
 
         {data && activeView === "stocks" ? (
@@ -242,36 +307,7 @@ function App() {
                 </div>
                 <span>{formatInteger(data.stocks.total)} 只</span>
               </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>代码</th>
-                      <th>名称</th>
-                      <th>价格</th>
-                      <th>涨跌幅</th>
-                      <th>成交额</th>
-                      <th>量比</th>
-                      <th>行业</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.stocks.items.map((stock) => (
-                      <tr key={stock.security_id}>
-                        <td className="mono">{stock.security_id}</td>
-                        <td>{stock.name}</td>
-                        <td>{formatNumber(stock.price)}</td>
-                        <td className={stock.change_pct && stock.change_pct > 0 ? "up" : "down"}>
-                          {formatSignedPercent(stock.change_pct)}
-                        </td>
-                        <td>{formatAmount(stock.amount)}</td>
-                        <td>{formatNumber(stock.volume_ratio)}</td>
-                        <td>{stock.industry_code ?? "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <StockTable stocks={data.stocks.items} />
             </section>
           </>
         ) : null}
@@ -308,6 +344,41 @@ function MetricPanel({
 
 function StatusPill({ status }: { status: DataStatus }) {
   return <div className={`status-pill ${status}`}>{status}</div>;
+}
+
+function StockTable({ stocks }: { stocks: StockItem[] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>代码</th>
+            <th>名称</th>
+            <th>价格</th>
+            <th>涨跌幅</th>
+            <th>成交额</th>
+            <th>量比</th>
+            <th>行业</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stocks.map((stock) => (
+            <tr key={stock.security_id}>
+              <td className="mono">{stock.security_id}</td>
+              <td>{stock.name}</td>
+              <td>{formatNumber(stock.price)}</td>
+              <td className={stock.change_pct && stock.change_pct > 0 ? "up" : "down"}>
+                {formatSignedPercent(stock.change_pct)}
+              </td>
+              <td>{formatAmount(stock.amount)}</td>
+              <td>{formatNumber(stock.volume_ratio)}</td>
+              <td>{stock.industry_code ?? "UNKNOWN"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 async function loadDashboardData(): Promise<DashboardData> {

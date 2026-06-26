@@ -79,3 +79,24 @@ def industries(
     """Return latest industry aggregates."""
 
     return get_industries(limit=limit, sort=sort, order=order)
+
+
+@app.get("/api/v1/industries/{industry_code}/stocks")
+def industry_stocks(
+    industry_code: str,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
+    sort: str = "change_pct",
+    order: Literal["asc", "desc"] = "desc",
+    filter: Literal["gainers", "losers", "limit_up", "limit_down", "volume"] | None = None,
+) -> Page[StockItem]:
+    """Return stocks from the latest snapshot for one industry."""
+
+    return get_stocks_page(
+        page=page,
+        size=size,
+        sort=sort,
+        order=order,
+        industry=industry_code,
+        filter=filter,
+    )

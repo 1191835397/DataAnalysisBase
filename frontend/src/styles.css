@@ -163,6 +163,21 @@ h2 {
   background: #fff7f5;
 }
 
+.inline-notice {
+  margin: 12px 18px;
+  border: 1px solid rgba(24, 34, 28, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #44574b;
+  background: #ffffff;
+}
+
+.inline-notice.error {
+  border-color: rgba(155, 47, 47, 0.28);
+  color: #762828;
+  background: #fff7f5;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -263,6 +278,10 @@ th {
 
 tbody tr:hover {
   background: rgba(31, 78, 56, 0.06);
+}
+
+.clickable-row {
+  cursor: pointer;
 }
 
 .mono {

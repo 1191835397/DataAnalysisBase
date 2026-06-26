@@ -62,6 +62,37 @@ def test_industries_endpoint_returns_latest_aggregates(monkeypatch, tmp_path: Pa
     assert payload[0]["stock_count"] == 2
 
 
+def test_industry_stocks_endpoint_returns_filtered_page(monkeypatch, tmp_path: Path) -> None:
+    db_path = _seed_market_data(tmp_path)
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/industries/TEST/stocks?size=1")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["industry_code"] == "TEST"
+
+
+def test_unknown_industry_stocks_endpoint_matches_null_industry(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = _seed_market_data(tmp_path, include_unknown_industry=True)
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/industries/UNKNOWN/stocks?size=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["security_id"] == "000001.SZ"
+    assert payload["items"][0]["industry_code"] is None
+
+
 def test_market_data_endpoint_reports_unavailable_database(
     monkeypatch,
     tmp_path: Path,
@@ -91,6 +122,14 @@ def test_industries_endpoint_rejects_invalid_limit() -> None:
     assert response.status_code == 422
 
 
+def test_industry_stocks_endpoint_rejects_invalid_page_size() -> None:
+    client = TestClient(app)
+
+    response = client.get("/api/v1/industries/TEST/stocks?size=201")
+
+    assert response.status_code == 422
+
+
 class MockProvider:
     name = "mock"
 
@@ -106,7 +145,7 @@ class MockProvider:
         )
 
 
-def _seed_market_data(tmp_path: Path) -> Path:
+def _seed_market_data(tmp_path: Path, *, include_unknown_industry: bool = False) -> Path:
     db_path = tmp_path / "analytics.duckdb"
     store = DuckDBStore(db_path)
     store.init_schema()
@@ -114,8 +153,13 @@ def _seed_market_data(tmp_path: Path) -> Path:
     sync = MarketBulkSync(
         MockProvider(
             [
-                _row(snapshot_time, "600519.SH", "贵州茅台", 1.5),
-                _row(snapshot_time, "300750.SZ", "宁德时代", -2.0),
+                _row(snapshot_time, "600519.SH", "贵州茅台", 1.5, industry_code="TEST"),
+                _row(snapshot_time, "300750.SZ", "宁德时代", -2.0, industry_code="TEST"),
+                *(
+                    [_row(snapshot_time, "000001.SZ", "平安银行", 0.1, industry_code=None)]
+                    if include_unknown_industry
+                    else []
+                ),
             ]
         ),
         SnapshotRepo(store),
@@ -131,6 +175,8 @@ def _row(
     security_id: str,
     name: str,
     change_pct: float,
+    *,
+    industry_code: str | None,
 ) -> MarketRow:
     return MarketRow(
         snapshot_time=snapshot_time,
@@ -147,7 +193,7 @@ def _row(
         pe_ttm=20,
         pb=3,
         market_cap=1000000,
-        industry_code="TEST",
+        industry_code=industry_code,
     )
 
 

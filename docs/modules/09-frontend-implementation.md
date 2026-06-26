@@ -54,6 +54,7 @@
 - 已安装 npm 依赖并生成 `package-lock.json`
 - 已用 `/api/v1/system/status`、`/api/v1/market/overview`、`/api/v1/stocks` 替换市场总览和股票列表占位数据
 - 已用 `/api/v1/industries` 接入行业排行视图
+- 已用 `/api/v1/industries/{code}/stocks` 接入行业成分股入口
 - `npm.cmd run build` 已通过
 
 ### 进行中
@@ -62,7 +63,7 @@
 
 ### 未开始
 
-- 行业成分股入口
+- 真实行业分类数据源接入
 
 ## 6. 关键决策
 
@@ -88,5 +89,5 @@
 ## 10. 下一步动作
 
 1. 补浏览器截图级视觉验证
-2. 补 `/api/v1/industries/{code}/stocks` 后接行业成分股入口
+2. 补真实行业分类数据源后优化行业页
 3. 拆分 `main.tsx` 中的页面、API client 和格式化工具

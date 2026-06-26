@@ -167,7 +167,7 @@ def _build_stock_where(query: StockQuery) -> tuple[str, list[Any]]:
     clauses: list[str] = []
     params: list[Any] = []
     if query.industry:
-        clauses.append("industry_code = ?")
+        clauses.append("coalesce(industry_code, 'UNKNOWN') = ?")
         params.append(query.industry)
     if query.q:
         clauses.append("(security_id ILIKE ? OR name ILIKE ?)")
