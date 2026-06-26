@@ -170,7 +170,8 @@ h2 {
 }
 
 .metric-panel,
-.table-panel {
+.table-panel,
+.empty-panel {
   border: 1px solid rgba(24, 34, 28, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
@@ -204,6 +205,21 @@ h2 {
 .table-panel {
   margin-top: 16px;
   overflow: hidden;
+}
+
+.empty-panel {
+  padding: 24px;
+}
+
+.empty-panel h2 {
+  margin-bottom: 10px;
+}
+
+.empty-panel p:last-child {
+  max-width: 560px;
+  margin: 0;
+  color: #4d5f54;
+  line-height: 1.6;
 }
 
 .section-heading {

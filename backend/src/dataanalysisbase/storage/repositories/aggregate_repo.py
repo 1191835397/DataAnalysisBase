@@ -23,6 +23,14 @@ class StockQuery(BaseModel):
     filter: Literal["gainers", "losers", "limit_up", "limit_down", "volume"] | None = None
 
 
+class IndustryQuery(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    limit: int = Field(default=50, ge=1, le=200)
+    sort: str = "change_pct_avg"
+    order: Literal["asc", "desc"] = "desc"
+
+
 class AggregateRepo(BaseRepo):
     """Maintain and query latest market aggregate tables."""
 
@@ -135,6 +143,25 @@ class AggregateRepo(BaseRepo):
         )
         return Page(items=rows, total=int(total_rows[0]["total"]), page=query.page, size=query.size)
 
+    def get_industries(self, query: IndustryQuery) -> list[dict[str, Any]]:
+        order_by = _safe_industry_sort(query.sort)
+        order = query.order.upper()
+        rows = self.store.query(
+            f"""
+            SELECT snapshot_time, industry_code, stock_count, change_pct_avg, amount_sum,
+                   up_count, down_count, source
+            FROM industry_snapshots
+            WHERE snapshot_time = (
+                SELECT max(snapshot_time)
+                FROM industry_snapshots
+            )
+            ORDER BY {order_by} {order} NULLS LAST, industry_code ASC
+            LIMIT ?
+            """,
+            [query.limit],
+        )
+        return rows
+
 
 def _build_stock_where(query: StockQuery) -> tuple[str, list[Any]]:
     clauses: list[str] = []
@@ -174,3 +201,16 @@ def _safe_sort(sort: str) -> str:
         "snapshot_time",
     }
     return sort if sort in allowed else "change_pct"
+
+
+def _safe_industry_sort(sort: str) -> str:
+    allowed = {
+        "industry_code",
+        "stock_count",
+        "change_pct_avg",
+        "amount_sum",
+        "up_count",
+        "down_count",
+        "snapshot_time",
+    }
+    return sort if sort in allowed else "change_pct_avg"

@@ -53,10 +53,11 @@
 - 已提供 `/api/v1/system/status`，支持可选 `online=true` provider 连通性诊断
 - 已提供 `/api/v1/market/overview`，读取最新 `market_overview_snapshots`
 - 已提供 `/api/v1/stocks`，读取 `latest_market_snapshot` 并支持分页、排序、筛选
+- 已提供 `/api/v1/industries`，读取最新 `industry_snapshots`
 
 ### 进行中
 
-- 行业排行与行业成分股 API
+- 行业成分股 API
 
 ### 未开始
 
@@ -85,6 +86,6 @@
 
 ## 10. 下一步动作
 
-1. 补 `/api/v1/industries`
-2. 补 `/api/v1/industries/{code}/stocks`
+1. 补 `/api/v1/industries/{code}/stocks`
+2. 补行业分类数据源，减少 `UNKNOWN` 行业聚合
 3. 评估是否按原设计引入统一 Envelope

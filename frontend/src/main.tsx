@@ -39,6 +39,15 @@ type StockItem = {
   industry_code: string | null;
 };
 
+type IndustryItem = {
+  industry_code: string;
+  stock_count: number;
+  change_pct_avg: number | null;
+  amount_sum: number | null;
+  up_count: number;
+  down_count: number;
+};
+
 type Page<T> = {
   items: T[];
   total: number;
@@ -49,21 +58,25 @@ type Page<T> = {
 type DashboardData = {
   status: RuntimeStatus;
   overview: MarketOverview;
+  industries: IndustryItem[];
   stocks: Page<StockItem>;
 };
 
 const navigation = [
-  { label: "市场总览", icon: Activity },
-  { label: "行业", icon: Layers },
-  { label: "股票", icon: Search },
-  { label: "告警", icon: Bell }
-];
+  { key: "overview", label: "市场总览", icon: Activity },
+  { key: "industries", label: "行业", icon: Layers },
+  { key: "stocks", label: "股票", icon: Search },
+  { key: "alerts", label: "告警", icon: Bell }
+] as const;
+
+type ActiveView = (typeof navigation)[number]["key"];
 
 function App() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeView, setActiveView] = useState<ActiveView>("overview");
 
   useEffect(() => {
     let isActive = true;
@@ -107,8 +120,14 @@ function App() {
           <span>DataAnalysisBase</span>
         </div>
         <nav>
-          {navigation.map(({ label, icon: Icon }, index) => (
-            <button className="nav-item" key={label} type="button" aria-current={index === 0}>
+          {navigation.map(({ key, label, icon: Icon }) => (
+            <button
+              className="nav-item"
+              key={key}
+              type="button"
+              aria-current={activeView === key}
+              onClick={() => setActiveView(key)}
+            >
               <Icon aria-hidden="true" size={18} />
               <span>{label}</span>
             </button>
@@ -138,7 +157,7 @@ function App() {
         {error ? <div className="notice error">{error}</div> : null}
         {isLoading ? <div className="notice">加载市场快照...</div> : null}
 
-        {data ? (
+        {data && activeView === "overview" ? (
           <>
             <section className="dashboard-grid" aria-label="市场总览">
               <MetricPanel
@@ -166,7 +185,55 @@ function App() {
                 caption={latestRunCaption(data.status)}
               />
             </section>
+          </>
+        ) : null}
 
+        {data && activeView === "industries" ? (
+          <section className="table-panel" aria-label="行业排行">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">行业排行</p>
+                <h2>均涨幅居前</h2>
+              </div>
+              <span>{formatInteger(data.industries.length)} 个行业</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>行业</th>
+                    <th>成分股</th>
+                    <th>均涨幅</th>
+                    <th>上涨</th>
+                    <th>下跌</th>
+                    <th>成交额</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.industries.map((industry) => (
+                    <tr key={industry.industry_code}>
+                      <td>{industry.industry_code}</td>
+                      <td>{formatInteger(industry.stock_count)}</td>
+                      <td
+                        className={
+                          industry.change_pct_avg && industry.change_pct_avg > 0 ? "up" : "down"
+                        }
+                      >
+                        {formatSignedPercent(industry.change_pct_avg)}
+                      </td>
+                      <td>{formatInteger(industry.up_count)}</td>
+                      <td>{formatInteger(industry.down_count)}</td>
+                      <td>{formatAmount(industry.amount_sum)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
+        {data && activeView === "stocks" ? (
+          <>
             <section className="table-panel" aria-label="股票列表">
               <div className="section-heading">
                 <div>
@@ -208,6 +275,14 @@ function App() {
             </section>
           </>
         ) : null}
+
+        {data && activeView === "alerts" ? (
+          <section className="empty-panel">
+            <p className="eyebrow">告警</p>
+            <h2>等待 surveillance 模块接入</h2>
+            <p>当前阶段先完成真实市场快照、行业排行和股票列表闭环。</p>
+          </section>
+        ) : null}
       </section>
     </main>
   );
@@ -236,12 +311,13 @@ function StatusPill({ status }: { status: DataStatus }) {
 }
 
 async function loadDashboardData(): Promise<DashboardData> {
-  const [status, overview, stocks] = await Promise.all([
+  const [status, overview, industries, stocks] = await Promise.all([
     fetchJson<RuntimeStatus>("/api/v1/system/status"),
     fetchJson<MarketOverview>("/api/v1/market/overview"),
+    fetchJson<IndustryItem[]>("/api/v1/industries?limit=12"),
     fetchJson<Page<StockItem>>("/api/v1/stocks?filter=gainers&size=12")
   ]);
-  return { status, overview, stocks };
+  return { status, overview, industries, stocks };
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

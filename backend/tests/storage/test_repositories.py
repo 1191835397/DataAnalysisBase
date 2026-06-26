@@ -4,7 +4,13 @@ from zoneinfo import ZoneInfo
 
 from dataanalysisbase.domain.contracts import MarketRow
 from dataanalysisbase.domain.enums import RunStatus
-from dataanalysisbase.storage import AggregateRepo, DuckDBStore, SnapshotRepo, StockQuery
+from dataanalysisbase.storage import (
+    AggregateRepo,
+    DuckDBStore,
+    IndustryQuery,
+    SnapshotRepo,
+    StockQuery,
+)
 
 
 def test_snapshot_write_is_idempotent(tmp_path: Path) -> None:
@@ -52,6 +58,11 @@ def test_aggregate_repo_refreshes_overview_and_stock_page(tmp_path: Path) -> Non
     page = aggregate_repo.get_stocks_page(StockQuery(size=1, filter="gainers"))
     assert page.total == 1
     assert page.items[0]["security_id"] == "600519.SH"
+
+    industries = aggregate_repo.get_industries(IndustryQuery(limit=1))
+    assert len(industries) == 1
+    assert industries[0]["industry_code"] == "TEST"
+    assert industries[0]["stock_count"] == 2
 
 
 def _row(snapshot_time: datetime, security_id: str, change_pct: float) -> MarketRow:

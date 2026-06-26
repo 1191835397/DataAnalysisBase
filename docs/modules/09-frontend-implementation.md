@@ -53,15 +53,16 @@
 - 已创建 Phase A 占位仪表盘、Vite proxy、基础样式
 - 已安装 npm 依赖并生成 `package-lock.json`
 - 已用 `/api/v1/system/status`、`/api/v1/market/overview`、`/api/v1/stocks` 替换市场总览和股票列表占位数据
+- 已用 `/api/v1/industries` 接入行业排行视图
 - `npm.cmd run build` 已通过
 
 ### 进行中
 
-- 前端页面与本地后端 dev server 联调
+- 前端页面与本地后端 dev server 视觉联调
 
 ### 未开始
 
-- 行业页真实 API 接入
+- 行业成分股入口
 
 ## 6. 关键决策
 
@@ -86,6 +87,6 @@
 
 ## 10. 下一步动作
 
-1. 启动后端 API 与 Vite dev server 做浏览器联调
-2. 补 `/api/v1/industries` 后接行业页真实数据
+1. 补浏览器截图级视觉验证
+2. 补 `/api/v1/industries/{code}/stocks` 后接行业成分股入口
 3. 拆分 `main.tsx` 中的页面、API client 和格式化工具

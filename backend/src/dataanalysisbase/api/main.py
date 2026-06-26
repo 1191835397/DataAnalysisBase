@@ -6,8 +6,10 @@ from fastapi import FastAPI, Query
 
 from dataanalysisbase import __version__
 from dataanalysisbase.api.market_data import (
+    IndustryItem,
     MarketOverview,
     StockItem,
+    get_industries,
     get_market_overview,
     get_stocks_page,
 )
@@ -66,3 +68,14 @@ def stocks(
         q=q,
         filter=filter,
     )
+
+
+@app.get("/api/v1/industries")
+def industries(
+    limit: int = Query(default=50, ge=1, le=200),
+    sort: str = "change_pct_avg",
+    order: Literal["asc", "desc"] = "desc",
+) -> list[IndustryItem]:
+    """Return latest industry aggregates."""
+
+    return get_industries(limit=limit, sort=sort, order=order)

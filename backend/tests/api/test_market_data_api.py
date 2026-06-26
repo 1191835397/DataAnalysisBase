@@ -48,6 +48,20 @@ def test_stocks_endpoint_returns_filtered_page(monkeypatch, tmp_path: Path) -> N
     assert payload["items"][0]["change_pct"] == 1.5
 
 
+def test_industries_endpoint_returns_latest_aggregates(monkeypatch, tmp_path: Path) -> None:
+    db_path = _seed_market_data(tmp_path)
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/industries?limit=1")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["industry_code"] == "TEST"
+    assert payload[0]["stock_count"] == 2
+
+
 def test_market_data_endpoint_reports_unavailable_database(
     monkeypatch,
     tmp_path: Path,
@@ -65,6 +79,14 @@ def test_stocks_endpoint_rejects_invalid_page_size() -> None:
     client = TestClient(app)
 
     response = client.get("/api/v1/stocks?size=201")
+
+    assert response.status_code == 422
+
+
+def test_industries_endpoint_rejects_invalid_limit() -> None:
+    client = TestClient(app)
+
+    response = client.get("/api/v1/industries?limit=201")
 
     assert response.status_code == 422
 

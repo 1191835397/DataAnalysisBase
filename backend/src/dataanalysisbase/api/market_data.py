@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from dataanalysisbase.common.errors import StorageError
 from dataanalysisbase.config_loader import load_settings
-from dataanalysisbase.storage import AggregateRepo, DuckDBStore, StockQuery
+from dataanalysisbase.storage import AggregateRepo, DuckDBStore, IndustryQuery, StockQuery
 from dataanalysisbase.storage.repositories.page import Page
 
 
@@ -49,6 +49,21 @@ class StockItem(BaseModel):
     industry_code: str | None = None
     source: str
     fetched_at: str
+
+
+class IndustryItem(BaseModel):
+    """Latest industry aggregate row."""
+
+    model_config = ConfigDict(frozen=True)
+
+    snapshot_time: str
+    industry_code: str
+    stock_count: int
+    change_pct_avg: float | None = None
+    amount_sum: float | None = None
+    up_count: int
+    down_count: int
+    source: str
 
 
 def get_market_overview() -> MarketOverview:
@@ -102,6 +117,26 @@ def get_stocks_page(
         page=result.page,
         size=result.size,
     )
+
+
+def get_industries(
+    *,
+    limit: int = 50,
+    sort: str = "change_pct_avg",
+    order: Literal["asc", "desc"] = "desc",
+) -> list[IndustryItem]:
+    """Return latest industry aggregates."""
+
+    query = IndustryQuery(limit=limit, sort=sort, order=order)
+    repo, store = _aggregate_repo()
+    try:
+        rows = repo.get_industries(query)
+    except StorageError as exc:
+        raise _service_unavailable(exc) from exc
+    finally:
+        store.close()
+
+    return [IndustryItem.model_validate(_jsonable_row(row)) for row in rows]
 
 
 def _aggregate_repo() -> tuple[AggregateRepo, DuckDBStore]:
