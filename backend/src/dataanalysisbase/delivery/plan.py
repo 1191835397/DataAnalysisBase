@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict
 
 from dataanalysisbase.common.errors import ConfigError
 from dataanalysisbase.config_loader import load_providers, load_settings, load_sync_schedule
+from dataanalysisbase.config_loader.providers_cfg import ProvidersConfig
+from dataanalysisbase.domain.enums import DatasetType
 from dataanalysisbase.providers import ProviderRegistry
 
 SYNC_MARKET_TABLES = [
@@ -29,6 +31,19 @@ class ProviderPlan(BaseModel):
     datasets: list[str]
     rate_limit_requests_per_minute: int | None
     retry: int
+
+
+class ProviderCandidatePlan(BaseModel):
+    """Provider candidate for a dataset-specific dry-run plan."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    enabled: bool
+    priority: int
+    supports_dataset: bool
+    token_env: str | None
+    token_configured: bool | None
 
 
 class SyncMarketPlan(BaseModel):
@@ -63,6 +78,7 @@ class SyncIndustryMappingPlan(BaseModel):
     run_mode: str
     config_dir: str
     provider: str
+    provider_candidates: list[ProviderCandidatePlan]
     target_file: str
     will_call_provider: bool
     will_write_file: bool
@@ -126,13 +142,25 @@ def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndu
         if akshare.industry_mapping_path.is_absolute()
         else settings.data_dir / akshare.industry_mapping_path
     )
+    candidates = _provider_candidates(
+        providers,
+        dataset=DatasetType.INDUSTRY_MAPPING,
+        token_values={"TUSHARE_TOKEN": settings.tushare_token},
+    )
+    enabled_candidates = [candidate for candidate in candidates if candidate.enabled]
+    selected_provider = (
+        min(enabled_candidates, key=lambda candidate: candidate.priority).name
+        if enabled_candidates
+        else "none"
+    )
 
     return SyncIndustryMappingPlan(
         command="sync-industry-mapping",
         dry_run=True,
         run_mode=settings.run_mode,
         config_dir=str(resolved_config_dir),
-        provider="akshare",
+        provider=selected_provider,
+        provider_candidates=candidates,
         target_file=str(target_file),
         will_call_provider=False,
         will_write_file=False,
@@ -142,3 +170,28 @@ def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndu
             "real execution fetches provider-native industry board membership",
         ],
     )
+
+
+def _provider_candidates(
+    providers: ProvidersConfig,
+    *,
+    dataset: DatasetType,
+    token_values: dict[str, str | None],
+) -> list[ProviderCandidatePlan]:
+    return [
+        ProviderCandidatePlan(
+            name=name,
+            enabled=provider.enabled,
+            priority=provider.priority,
+            supports_dataset=dataset in provider.datasets,
+            token_env=provider.token_env,
+            token_configured=(
+                None if provider.token_env is None else bool(token_values.get(provider.token_env))
+            ),
+        )
+        for name, provider in sorted(
+            providers.providers.items(),
+            key=lambda item: (not item[1].enabled, item[1].priority, item[0]),
+        )
+        if dataset in provider.datasets
+    ]

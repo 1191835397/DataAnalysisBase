@@ -50,6 +50,10 @@ def test_plan_sync_industry_mapping_json_outputs_dry_run_payload(capsys) -> None
     assert exit_code == 0
     assert payload["command"] == "sync-industry-mapping"
     assert payload["dry_run"] is True
+    assert [candidate["name"] for candidate in payload["provider_candidates"]] == [
+        "akshare",
+        "tushare",
+    ]
     assert payload["will_call_provider"] is False
     assert payload["will_write_file"] is False
 

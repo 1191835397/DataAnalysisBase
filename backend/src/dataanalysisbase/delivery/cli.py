@@ -160,6 +160,17 @@ def _plan_sync_industry_mapping(args: argparse.Namespace) -> int:
         print("dry-run: true")
         print(f"provider: {plan.provider}")
         print(f"target_file: {plan.target_file}")
+        for candidate in plan.provider_candidates:
+            token = (
+                "n/a"
+                if candidate.token_configured is None
+                else ("configured" if candidate.token_configured else "missing")
+            )
+            print(
+                "provider_candidate:"
+                f"{candidate.name}: enabled={candidate.enabled}, "
+                f"priority={candidate.priority}, token={token}"
+            )
         print("will_call_provider: false")
         print("will_write_file: false")
     return 0
@@ -203,6 +214,17 @@ def _sync_industry_mapping(args: argparse.Namespace) -> int:
             print("pass --execute to call provider and write industry mapping file")
             print(f"provider: {plan.provider}")
             print(f"target_file: {plan.target_file}")
+            for candidate in plan.provider_candidates:
+                token = (
+                    "n/a"
+                    if candidate.token_configured is None
+                    else ("configured" if candidate.token_configured else "missing")
+                )
+                print(
+                    "provider_candidate:"
+                    f"{candidate.name}: enabled={candidate.enabled}, "
+                    f"priority={candidate.priority}, token={token}"
+                )
         return 0
 
     result = run_industry_mapping_sync(config_dir=args.config_dir)

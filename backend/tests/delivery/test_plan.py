@@ -44,6 +44,12 @@ def test_sync_industry_mapping_plan_targets_configured_mapping_file() -> None:
     assert plan.command == "sync-industry-mapping"
     assert plan.dry_run is True
     assert plan.provider == "akshare"
+    assert [candidate.name for candidate in plan.provider_candidates] == ["akshare", "tushare"]
+    assert plan.provider_candidates[0].enabled is True
+    assert plan.provider_candidates[0].token_configured is None
+    assert plan.provider_candidates[1].enabled is False
+    assert plan.provider_candidates[1].token_env == "TUSHARE_TOKEN"
+    assert plan.provider_candidates[1].token_configured is False
     assert plan.target_file.endswith("data\\industry_mapping.csv") or plan.target_file.endswith(
         "data/industry_mapping.csv"
     )
