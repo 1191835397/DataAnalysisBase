@@ -85,10 +85,10 @@
 
 - AKShare 上游页面变动会导致接口失效
 - 免费源字段格式偶发变化，需要规范化层兜底
-- AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证；`efinance` 行业映射真实字段可用性待安装依赖后验证
+- AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证；`efinance` `get_realtime_quotes()` 已确认默认响应不含行业字段，不能直接生成行业映射
 
 ## 10. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
 2. 配置 `DAB_TUSHARE_TOKEN` 后执行 `dab sync industry-mapping --provider tushare --execute`
-3. 安装 providers 可选依赖后执行 `dab sync industry-mapping --provider efinance --execute`，确认 `efinance` 实时行情响应是否包含可用行业字段
+3. 继续寻找可提供行业字段的数据源：优先配置 Tushare token，其次评估 CNInfo / 交易所基础信息 / 本地静态映射；`efinance` 只保留为行情或基金备用源候选

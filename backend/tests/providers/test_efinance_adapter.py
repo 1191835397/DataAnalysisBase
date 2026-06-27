@@ -42,6 +42,24 @@ def test_efinance_adapter_reports_missing_dependency_without_injected_fetcher(mo
         raise AssertionError("expected ProviderError")
 
 
+def test_efinance_adapter_reports_missing_industry_fields() -> None:
+    adapter = EfinanceAdapter(
+        realtime_quotes_fetcher=lambda: FakeFrame(
+            [{"股票代码": "600519", "股票名称": "贵州茅台", "最新价": 100}]
+        )
+    )
+
+    try:
+        adapter.fetch_industry_mapping()
+    except ProviderError as exc:
+        assert exc.provider == "efinance"
+        assert exc.dataset_type == "industry_mapping"
+        assert exc.retryable is False
+        assert "do not include industry fields" in str(exc)
+    else:
+        raise AssertionError("expected ProviderError")
+
+
 class FakeFrame:
     def __init__(self, records: list[dict[str, object]]) -> None:
         self.records = records

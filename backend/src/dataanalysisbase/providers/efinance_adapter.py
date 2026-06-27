@@ -10,6 +10,7 @@ from dataanalysisbase.common.errors import InvalidSecurityId, ProviderError
 from dataanalysisbase.domain.symbols import SecurityId
 
 INDUSTRY_MAPPING_DATASET = "industry_mapping"
+INDUSTRY_FIELD_NAMES = ("industry", "industry_name", "所属行业", "行业", "板块")
 
 
 class EfinanceAdapter:
@@ -34,17 +35,18 @@ class EfinanceAdapter:
         except Exception as exc:
             raise ProviderError(self.name, INDUSTRY_MAPPING_DATASET, str(exc)) from exc
 
+        if records and not any(_has_any_field(record, INDUSTRY_FIELD_NAMES) for record in records):
+            raise ProviderError(
+                self.name,
+                INDUSTRY_MAPPING_DATASET,
+                "efinance realtime quotes do not include industry fields",
+                retryable=False,
+            )
+
         mapping: dict[str, str] = {}
         for record in records:
             security_id = _security_id_from_record(record)
-            industry = _string_value(
-                record,
-                "industry",
-                "industry_name",
-                "所属行业",
-                "行业",
-                "板块",
-            )
+            industry = _string_value(record, *INDUSTRY_FIELD_NAMES)
             if security_id is not None and industry is not None:
                 mapping[security_id] = industry
         return mapping
@@ -115,3 +117,7 @@ def _string_value(record: Mapping[str, Any], *names: str) -> str | None:
             text = str(value).strip()
             return text or None
     return None
+
+
+def _has_any_field(record: Mapping[str, Any], names: tuple[str, ...]) -> bool:
+    return any(name in record for name in names)
