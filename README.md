@@ -24,6 +24,7 @@
 | [docs/UI_DESIGN.md](docs/UI_DESIGN.md) | Web 仪表盘设计 |
 | [docs/DESIGN_REVIEW.md](docs/DESIGN_REVIEW.md) | 设计评审与优化建议 |
 | [docs/INTELLIGENCE_ROADMAP.md](docs/INTELLIGENCE_ROADMAP.md) | 智能化与扩展路线 |
+| [docs/EXTERNAL_INTEGRATIONS.md](docs/EXTERNAL_INTEGRATIONS.md) | 外部金融开源工具分层接入策略 |
 | [docs/PRODUCT_OUTCOMES.md](docs/PRODUCT_OUTCOMES.md) | 最终效果说明 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 实施路线图 |
 

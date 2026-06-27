@@ -11,11 +11,12 @@
 4. UI_DESIGN.md         → 仪表盘长什么样
 5. DESIGN_REVIEW.md     → 设计是否能达成目标
 6. INTELLIGENCE_ROADMAP → 怎么更智能、更完善
-7. FRAMEWORK_REFERENCES → 外部项目可借鉴点
-8. MODULE_DESIGN.md     → 各模块怎么拆、怎么实现
-9. CODING_STANDARDS.md  → 代码风格与工程原则（编码期强制）
-10. PRODUCT_OUTCOMES.md → 做完能看到什么
-11. ROADMAP.md          → 实现顺序
+7. EXTERNAL_INTEGRATIONS → 外部金融开源工具如何分层接入
+8. FRAMEWORK_REFERENCES → 外部 Agent/金融框架可借鉴点
+9. MODULE_DESIGN.md     → 各模块怎么拆、怎么实现
+10. CODING_STANDARDS.md → 代码风格与工程原则（编码期强制）
+11. PRODUCT_OUTCOMES.md → 做完能看到什么
+12. ROADMAP.md          → 实现顺序
 ```
 
 ## 文档列表
@@ -35,6 +36,7 @@
 | [UI_DESIGN.md](./UI_DESIGN.md) | React 仪表盘六页、REST/WebSocket API |
 | [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | 当前设计评审、优化点与剩余风险 |
 | [INTELLIGENCE_ROADMAP.md](./INTELLIGENCE_ROADMAP.md) | 智能化与扩展路线（自适应异常、事件叙事、NL 查询、持仓、正确性陷阱） |
+| [EXTERNAL_INTEGRATIONS.md](./EXTERNAL_INTEGRATIONS.md) | 外部金融开源工具分层接入策略（efinance、Tushare、QuantStats、vectorbt、Qlib 等） |
 | [FRAMEWORK_REFERENCES.md](./FRAMEWORK_REFERENCES.md) | Superpowers / Claw Code / ECC / Anthropic financial-services / TradingAgents 的可借鉴点与落地建议 |
 | [PRODUCT_OUTCOMES.md](./PRODUCT_OUTCOMES.md) | 最终实现效果与用户场景 |
 | [DATA_SOURCES.md](./DATA_SOURCES.md) | AKShare / Tushare 数据源 |
