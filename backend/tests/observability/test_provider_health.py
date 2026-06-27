@@ -32,13 +32,13 @@ def test_provider_health_reports_available_dependency(monkeypatch) -> None:
 
 def test_provider_health_warns_for_missing_token(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "tushare", ModuleType("tushare"))
-    monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+    monkeypatch.delenv("DAB_TUSHARE_TOKEN", raising=False)
     config = ProvidersConfig(
         version="1.0",
         providers={
             "tushare": ProviderEntry(
                 enabled=True,
-                token_env="TUSHARE_TOKEN",
+                token_env="DAB_TUSHARE_TOKEN",
                 datasets=[DatasetType.DAILY_BARS],
             )
         },
@@ -47,7 +47,7 @@ def test_provider_health_warns_for_missing_token(monkeypatch) -> None:
     health = build_provider_health(config)
 
     assert health[0].status == "warning"
-    assert health[0].message == "token env not configured: TUSHARE_TOKEN"
+    assert health[0].message == "token env not configured: DAB_TUSHARE_TOKEN"
 
 
 def test_provider_health_ignores_disabled_provider_missing_dependency() -> None:

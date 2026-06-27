@@ -858,7 +858,7 @@ DataAnalysisBase/
 
 | 项 | 措施 |
 |----|------|
-| API Key | `.env` 存储，`TUSHARE_TOKEN`, `DEEPSEEK_API_KEY` 不进 git |
+| API Key | `.env` 存储，`DAB_TUSHARE_TOKEN`, `DAB_DEEPSEEK_API_KEY` 不进 git |
 | 数据用途 | 仅限个人研究，遵守 AKShare / Tushare 使用条款 |
 | 免责声明 | 系统输出不构成投资建议，报告模板内置声明 |
 | 敏感信息 | 不存储券商账户、持仓密码等 |

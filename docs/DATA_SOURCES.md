@@ -98,7 +98,7 @@ class AkshareAdapter(DataProvider):
 |------|-----|
 | 安装 | `pip install tushare` |
 | 费用 | 免费档 + 积分制 |
-| Token | 必须，环境变量 `TUSHARE_TOKEN` |
+| Token | 必须，环境变量 `DAB_TUSHARE_TOKEN` |
 | 官网 | https://tushare.pro |
 
 ### 3.2 数据实际来源

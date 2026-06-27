@@ -181,7 +181,7 @@ flowchart TD
 
 ## 6. 配置与表
 
-- 读 `providers.yaml`（`ProvidersConfig`）、env `TUSHARE_TOKEN`
+- 读 `providers.yaml`（`ProvidersConfig`）、env `DAB_TUSHARE_TOKEN`
 - 不直接写表；`RawDataset` 由 ingest 交 storage 落 `raw_snapshots`
 - 限流参数来自配置 `rate_limit_per_min`
 

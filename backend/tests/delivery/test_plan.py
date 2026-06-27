@@ -52,7 +52,7 @@ def test_sync_industry_mapping_plan_targets_configured_mapping_file() -> None:
     assert plan.provider_candidates[0].enabled is True
     assert plan.provider_candidates[0].token_configured is None
     assert plan.provider_candidates[1].enabled is False
-    assert plan.provider_candidates[1].token_env == "TUSHARE_TOKEN"
+    assert plan.provider_candidates[1].token_env == "DAB_TUSHARE_TOKEN"
     assert plan.provider_candidates[1].token_configured is False
     assert plan.provider_candidates[2].enabled is False
     assert plan.provider_candidates[2].token_configured is None

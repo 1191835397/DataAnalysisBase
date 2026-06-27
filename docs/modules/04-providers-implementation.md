@@ -87,7 +87,19 @@
 - 免费源字段格式偶发变化，需要规范化层兜底
 - AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证；`efinance` `get_realtime_quotes()` 已确认默认响应不含行业字段，不能直接生成行业映射
 
-## 10. 下一步动作
+## 10. Tushare Token 配置记录
+
+- 本项目运行时读取 `DAB_TUSHARE_TOKEN`，对应 `Settings.tushare_token`
+- `providers.yaml` 的 `tushare.token_env` 也应写为 `DAB_TUSHARE_TOKEN`，用于 plan / doctor 展示
+- 真实 token 只允许放在本地环境变量或本地 `.env`，不要提交到 git
+- 推荐本地文件位置：`backend/.env`
+- 示例：
+
+```text
+DAB_TUSHARE_TOKEN=你的_tushare_pro_token
+```
+
+## 11. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
 2. 配置 `DAB_TUSHARE_TOKEN` 后执行 `dab sync industry-mapping --provider tushare --execute`

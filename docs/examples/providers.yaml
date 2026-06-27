@@ -24,7 +24,7 @@ providers:
   tushare:
     enabled: true
     priority: 1
-    token_env: TUSHARE_TOKEN
+    token_env: DAB_TUSHARE_TOKEN
     rate_limit:
       requests_per_minute: 200
     datasets:

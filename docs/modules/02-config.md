@@ -51,10 +51,10 @@ class Settings(BaseSettings):
     chroma_dir: Path = Path("data/chroma")
     run_mode: Literal["live", "replay"] = "live"
 
-    deepseek_api_key: str | None = None     # 来自 env DEEPSEEK_API_KEY
-    tushare_token: str | None = None        # 来自 env TUSHARE_TOKEN
+    deepseek_api_key: str | None = None     # 来自 env DAB_DEEPSEEK_API_KEY
+    tushare_token: str | None = None        # 来自 env DAB_TUSHARE_TOKEN
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="DAB_", extra="ignore")
 ```
 
 ### 3.2 调度配置（`surveillance_cfg.py`，映射 sync_schedule.yaml）
@@ -190,7 +190,7 @@ def reload(name: str) -> BaseModel
 |------|------|
 | 文件缺失 | 必需配置抛 `ConfigError`；可选配置用默认值 |
 | 字段非法 | Pydantic `ValidationError` 包装为 `ConfigError`，启动终止 |
-| env 缺密钥 | 对应能力降级（如无 `TUSHARE_TOKEN` → tushare 不启用）并告警，不崩溃 |
+| env 缺密钥 | 对应能力降级（如无 `DAB_TUSHARE_TOKEN` → tushare 不启用）并告警，不崩溃 |
 | 热加载校验失败 | 保留旧配置 + 记录告警，不中断运行 |
 
 ---

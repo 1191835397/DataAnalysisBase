@@ -149,7 +149,7 @@ def build_sync_industry_mapping_plan(
     candidates = _provider_candidates(
         providers,
         dataset=DatasetType.INDUSTRY_MAPPING,
-        token_values={"TUSHARE_TOKEN": settings.tushare_token},
+        token_values={"DAB_TUSHARE_TOKEN": settings.tushare_token},
     )
     selected_provider = _selected_provider(candidates, provider)
 
