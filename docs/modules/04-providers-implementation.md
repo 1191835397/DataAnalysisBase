@@ -59,6 +59,7 @@
 - `AkshareAdapter` 已预留 `industry_mapping_fetcher` 备用映射入口，可承接后续 Tushare / CNInfo / 本地静态行业映射；映射文件缺失或解析失败时降级保留快照
 - `dab doctor` 已检查 `industry_mapping_path` 文件是否存在、可解析，并返回记录数或明确 warning/error
 - `dab sync industry-mapping` 已提供默认 dry-run；`--execute` 时通过 provider-native 行业板块接口生成本地 `data/industry_mapping.csv`，0 条映射视为 failed 且不写空文件
+- `TushareAdapter.fetch_industry_mapping()` 已接入 Tushare `stock_basic` 行业字段；`sync industry-mapping` 可按 `providers.yaml` 优先级 fallback 到 Tushare
 - 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
@@ -81,9 +82,9 @@
 
 - AKShare 上游页面变动会导致接口失效
 - 免费源字段格式偶发变化，需要规范化层兜底
-- AKShare 行业板块接口当前真实同步返回 0 条映射，行业补全真实效果待下次可联网验证
+- AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证
 
 ## 10. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
-2. 在 AKShare 行业接口恢复时重新执行 `dab sync industry-mapping --execute`，生成真实 `data/industry_mapping.csv`
+2. 配置 `DAB_TUSHARE_TOKEN` 并启用 Tushare `industry_mapping` 后执行 `dab sync industry-mapping --execute`

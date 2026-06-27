@@ -8,8 +8,14 @@ from pathlib import Path
 from dataanalysisbase.config_loader import load_providers, load_settings
 from dataanalysisbase.config_loader.providers_cfg import ProviderEntry
 from dataanalysisbase.domain.contracts import SyncResult
+from dataanalysisbase.domain.enums import DatasetType
 from dataanalysisbase.ingest import MarketBulkSync
-from dataanalysisbase.providers import AkshareAdapter, MarketDataProvider, ProviderRegistry
+from dataanalysisbase.providers import (
+    AkshareAdapter,
+    MarketDataProvider,
+    ProviderRegistry,
+    TushareAdapter,
+)
 from dataanalysisbase.providers.industry_mapping import (
     IndustryMappingProvider,
     IndustryMappingSyncResult,
@@ -55,8 +61,44 @@ def run_industry_mapping_sync(
     providers = load_providers(resolved_config_dir)
     provider_config = _akshare_config(providers.providers)
     target_path = _resolve_data_path(settings.data_dir, provider_config.industry_mapping_path)
-    selected_provider = provider or AkshareAdapter()
+    selected_providers = (
+        [provider]
+        if provider is not None
+        else _industry_mapping_providers(
+            providers.providers,
+            tushare_token=settings.tushare_token,
+        )
+    )
 
+    if not selected_providers:
+        return IndustryMappingSyncResult(
+            status="failed",
+            source="none",
+            path=str(target_path),
+            records=0,
+            errors=["No enabled provider supports industry_mapping"],
+        )
+
+    errors: list[str] = []
+    for selected_provider in selected_providers:
+        result = _try_write_industry_mapping(selected_provider, target_path)
+        if result.status == "success":
+            return result
+        errors.extend(f"{selected_provider.name}: {error}" for error in result.errors)
+
+    return IndustryMappingSyncResult(
+        status="failed",
+        source=",".join(provider.name for provider in selected_providers),
+        path=str(target_path),
+        records=0,
+        errors=errors,
+    )
+
+
+def _try_write_industry_mapping(
+    selected_provider: IndustryMappingProvider,
+    target_path: Path,
+) -> IndustryMappingSyncResult:
     try:
         mapping = selected_provider.fetch_industry_mapping()
         if not mapping:
@@ -83,6 +125,39 @@ def run_industry_mapping_sync(
         path=str(target_path),
         records=records,
     )
+
+
+def _industry_mapping_providers(
+    providers: dict[str, ProviderEntry],
+    *,
+    tushare_token: str | None,
+) -> list[IndustryMappingProvider]:
+    candidates = [
+        (name, provider)
+        for name, provider in providers.items()
+        if provider.enabled and DatasetType.INDUSTRY_MAPPING in provider.datasets
+    ]
+    return [
+        _build_industry_mapping_provider(name, provider_config, tushare_token=tushare_token)
+        for name, provider_config in sorted(candidates, key=lambda item: item[1].priority)
+    ]
+
+
+def _build_industry_mapping_provider(
+    name: str,
+    provider_config: ProviderEntry,
+    *,
+    tushare_token: str | None,
+) -> IndustryMappingProvider:
+    if name == "akshare":
+        return AkshareAdapter()
+    if name == "tushare":
+        token = tushare_token
+        if provider_config.token_env and token is None:
+            token = None
+        return TushareAdapter(token=token)
+    msg = f"Unsupported industry_mapping provider: {name}"
+    raise ValueError(msg)
 
 
 def _akshare_config(providers: dict[str, ProviderEntry]) -> ProviderEntry:

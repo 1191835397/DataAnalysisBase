@@ -9,6 +9,7 @@ from dataanalysisbase.config_loader.loader import (
     load_sync_schedule,
     load_watchlist,
 )
+from dataanalysisbase.domain.enums import DatasetType
 
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
 
@@ -19,6 +20,7 @@ def test_load_providers_reads_runtime_config() -> None:
     assert providers.providers["akshare"].enabled is True
     assert providers.providers["akshare"].rate_limit.requests_per_minute == 30
     assert str(providers.providers["akshare"].industry_mapping_path) == "industry_mapping.csv"
+    assert DatasetType.INDUSTRY_MAPPING in providers.providers["akshare"].datasets
 
 
 def test_load_sync_schedule_requires_valid_jobs() -> None:

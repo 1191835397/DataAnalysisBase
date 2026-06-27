@@ -21,6 +21,7 @@ class SecurityType(StrEnum):
 
 class DatasetType(StrEnum):
     MARKET_SPOT = "market_spot"
+    INDUSTRY_MAPPING = "industry_mapping"
     DAILY_BARS = "daily_bars"
     VALUATION = "valuation"
     FINANCIALS = "financials"

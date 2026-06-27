@@ -13,6 +13,7 @@ providers:
       retry_delay_sec: 2
     datasets:
       - market_spot
+      - industry_mapping
       - daily_bars
       - valuation
       - financials
@@ -27,6 +28,7 @@ providers:
     rate_limit:
       requests_per_minute: 200
     datasets:
+      - industry_mapping
       - daily_bars
       - valuation
       - financials

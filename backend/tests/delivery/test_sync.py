@@ -97,8 +97,36 @@ def test_run_industry_mapping_sync_fails_on_empty_mapping(tmp_path: Path, monkey
 
     assert result.status == "failed"
     assert result.records == 0
-    assert result.errors == ["provider returned 0 industry mapping records"]
+    assert result.errors == ["mock: provider returned 0 industry mapping records"]
     assert not (data_dir / "industry_mapping.csv").exists()
+
+
+def test_run_industry_mapping_sync_falls_back_to_secondary_provider(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.load_settings",
+        lambda: Settings(config_dir=ROOT_CONFIG, data_dir=data_dir, tushare_token="token"),
+    )
+    providers = [
+        MockIndustryMappingProvider({}, name="akshare"),
+        MockIndustryMappingProvider({"600519.SH": "白酒"}, name="tushare"),
+    ]
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync._industry_mapping_providers",
+        lambda _providers, *, tushare_token: providers,
+    )
+
+    result = run_industry_mapping_sync(config_dir=ROOT_CONFIG)
+
+    assert result.status == "success"
+    assert result.source == "tushare"
+    assert result.records == 1
+    assert (data_dir / "industry_mapping.csv").read_text(encoding="utf-8") == (
+        "security_id,industry\n600519.SH,白酒\n"
+    )
 
 
 class MockProvider:
@@ -117,10 +145,9 @@ class MockProvider:
 
 
 class MockIndustryMappingProvider:
-    name = "mock"
-
-    def __init__(self, mapping: dict[str, str]) -> None:
+    def __init__(self, mapping: dict[str, str], *, name: str = "mock") -> None:
         self.mapping = mapping
+        self.name = name
 
     def fetch_industry_mapping(self) -> dict[str, str]:
         return self.mapping
