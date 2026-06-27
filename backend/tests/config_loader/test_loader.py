@@ -21,6 +21,8 @@ def test_load_providers_reads_runtime_config() -> None:
     assert providers.providers["akshare"].rate_limit.requests_per_minute == 30
     assert str(providers.providers["akshare"].industry_mapping_path) == "industry_mapping.csv"
     assert DatasetType.INDUSTRY_MAPPING in providers.providers["akshare"].datasets
+    assert providers.providers["efinance"].enabled is False
+    assert DatasetType.INDUSTRY_MAPPING in providers.providers["efinance"].datasets
 
 
 def test_load_sync_schedule_requires_valid_jobs() -> None:

@@ -42,7 +42,7 @@ research = ["pyqlib"]
 ## 4. 推荐落地顺序
 
 1. `efinance` / Tushare 行业映射备用源  
-   目标是生成有效 `data/industry_mapping.csv`，解决当前 AKShare 行业接口返回 0 条的问题。Tushare `stock_basic` adapter 插槽已接入，真实效果需配置 token 后验证。
+   目标是生成有效 `data/industry_mapping.csv`，解决当前 AKShare 行业接口返回 0 条的问题。Tushare `stock_basic` adapter 插槽已接入，真实效果需配置 token 后验证；`efinance` 行业映射候选槽位已接入，真实字段可用性需安装 `efinance` 后验证。
 
 2. QuantStats 报告插槽  
    在 portfolio 模块有持仓和收益序列后，提供 `dab report portfolio` 生成本地报告。
@@ -72,7 +72,7 @@ research = ["pyqlib"]
 
 ## 6. 对当前项目的直接动作
 
-- provider 层：已新增 `TushareAdapter.fetch_industry_mapping()`；后续可继续新增 `EfinanceAdapter`，写入同一个 `data/industry_mapping.csv` 插槽。
+- provider 层：已新增 `TushareAdapter.fetch_industry_mapping()` 与 `EfinanceAdapter.fetch_industry_mapping()` 候选槽位，统一写入同一个 `data/industry_mapping.csv` 插槽；`efinance` 目前按可选依赖懒加载，不进入默认主链路。
 - observability 层：doctor 检查可选依赖是否安装、功能是否启用、目标文件是否有效。
 - delivery 层：所有重功能先提供 dry-run plan，再提供 `--execute`。
 - docs 层：每引入一个可选工具，都要记录边界、数据来源、失败降级和验证命令。

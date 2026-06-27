@@ -41,6 +41,7 @@
 | 本地行业映射文件 | 单元测试 | `passed` | 支持 CSV / JSON；`ProviderRegistry` 可按 `industry_mapping_path` 注入读取器 |
 | 行业映射诊断 | 单元测试 | `passed` | `dab doctor` 可报告映射文件缺失 warning、解析成功记录数 |
 | Tushare 行业映射备用源 | 单元测试 | `passed` | mock `stock_basic` 字段映射；无 token 时返回不可重试 `ProviderError` |
+| efinance 行业映射候选槽位 | 单元测试 | `passed` | mock 实时行情字段映射；缺依赖时返回不可重试 `ProviderError`；真实字段待安装后验证 |
 | 行业映射同步命令 | 单元测试 | `passed` | `dab sync industry-mapping` 默认 dry-run；mock provider `--execute` 可写 CSV；0 条映射视为 failed；支持 fallback 到第二 provider |
 | 真实 AKShare 行业接口 | 手动验证 | `blocked` | `dab sync industry-mapping --execute --json` 当前返回 0 条映射 |
 
@@ -55,13 +56,13 @@
 
 - 免费源仍可能因上游策略、接口变更或网络权限失败，需要保留失败 run 与 status 诊断
 - 行业补全已具备降级实现，但真实行业接口当前不可用，真实同步仍可能继续产生 `UNKNOWN` 行业
-- 本地行业映射文件入口与同步命令已接入，但真实 AKShare 行业接口当前返回 0 条映射；Tushare 备用源需要配置 token 后验证，真实 `data/industry_mapping.csv` 尚未生成
+- 本地行业映射文件入口与同步命令已接入，但真实 AKShare 行业接口当前返回 0 条映射；Tushare 备用源需要配置 token 后验证，`efinance` 备用源需要安装依赖并确认真实响应字段后验证，真实 `data/industry_mapping.csv` 尚未生成
 
 ## 6. 剩余风险
 
 - AKShare/Eastmoney 免费接口稳定性不可保证，后续仍需观察失败率并评估 Tushare / 其他源补充
-- 行业分类仍需要落地真实映射文件或自动生成流程，否则行业页数据质量依赖单个 AKShare 行业接口
+- 行业分类仍需要落地真实映射文件或自动生成流程，否则行业页数据质量依赖单个 AKShare 行业接口；`efinance` 当前只是候选槽位，不能当成已验证真实备用源
 
 ## 7. 验收结论
 
-当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。行业字段补全、本地备用映射入口和 registry 注入已通过 mock 测试，但真实行业接口当前阻塞，需后续补充真实映射文件或自动生成流程。
+当前达到最小 adapter、registry、手动同步入口、本地 provider health、显式联网健康检查、指数退避 retry / 限流 wrapper、AKShare 备用现货接口、失败 run 持久化与真实成功快照验证标准。行业字段补全、本地备用映射入口和 registry 注入已通过 mock 测试；Tushare 与 efinance 备用槽位已可被 plan/sync 识别，但真实行业接口当前仍阻塞，需后续补充真实映射文件或自动生成流程。

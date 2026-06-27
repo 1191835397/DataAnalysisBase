@@ -80,7 +80,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Preview local industry mapping refresh",
     )
     plan_sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
-    plan_sync_industry_mapping.add_argument("--provider", choices=["akshare", "tushare"])
+    plan_sync_industry_mapping.add_argument(
+        "--provider",
+        choices=["akshare", "efinance", "tushare"],
+    )
     plan_sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
 
     sync_parser = subparsers.add_parser("sync", help="Run manual sync jobs")
@@ -95,7 +98,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Refresh local security-to-industry mapping",
     )
     sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
-    sync_industry_mapping.add_argument("--provider", choices=["akshare", "tushare"])
+    sync_industry_mapping.add_argument(
+        "--provider",
+        choices=["akshare", "efinance", "tushare"],
+    )
     sync_industry_mapping.add_argument("--execute", action="store_true")
     sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
     return parser

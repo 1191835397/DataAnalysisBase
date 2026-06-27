@@ -36,6 +36,15 @@ providers:
       - index
       - macro
 
+  efinance:
+    enabled: false
+    priority: 3
+    rate_limit:
+      requests_per_minute: 60
+    datasets:
+      - industry_mapping
+      - fund_nav
+
   cninfo:
     enabled: false
     priority: 1

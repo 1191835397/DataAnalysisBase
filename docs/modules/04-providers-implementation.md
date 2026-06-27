@@ -60,8 +60,9 @@
 - `dab doctor` 已检查 `industry_mapping_path` 文件是否存在、可解析，并返回记录数或明确 warning/error
 - `dab sync industry-mapping` 已提供默认 dry-run；`--execute` 时通过 provider-native 行业板块接口生成本地 `data/industry_mapping.csv`，0 条映射视为 failed 且不写空文件
 - `TushareAdapter.fetch_industry_mapping()` 已接入 Tushare `stock_basic` 行业字段；`sync industry-mapping` 可按 `providers.yaml` 优先级 fallback 到 Tushare
+- `EfinanceAdapter.fetch_industry_mapping()` 已作为可选候选槽位接入，默认 disabled；`efinance` 缺依赖或真实响应缺少行业字段时会结构化失败，不写空映射文件
 - `dab plan sync-industry-mapping` / dry-run 输出已包含候选 provider、启用状态、优先级与 token 配置状态
-- `dab sync industry-mapping --provider tushare --execute` 可显式指定 Tushare 做一次性验证，不必先修改默认 provider 启用顺序
+- `dab sync industry-mapping --provider tushare|efinance --execute` 可显式指定备用源做一次性验证，不必先修改默认 provider 启用顺序
 - 真实 AKShare 全市场快照验证已成功：`2026-06-26T10:56:34.716157+08:00`，`expected=5367`、`actual=5367`、`missing=0`
 
 ## 6. 关键决策
@@ -84,9 +85,10 @@
 
 - AKShare 上游页面变动会导致接口失效
 - 免费源字段格式偶发变化，需要规范化层兜底
-- AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证
+- AKShare 行业板块接口当前真实同步返回 0 条映射；Tushare 行业映射真实效果待配置 token 后验证；`efinance` 行业映射真实字段可用性待安装依赖后验证
 
 ## 10. 下一步动作
 
 1. 在行业接口可用时重新执行真实同步，确认行业分类不再聚合为 `UNKNOWN`
 2. 配置 `DAB_TUSHARE_TOKEN` 后执行 `dab sync industry-mapping --provider tushare --execute`
+3. 安装 providers 可选依赖后执行 `dab sync industry-mapping --provider efinance --execute`，确认 `efinance` 实时行情响应是否包含可用行业字段

@@ -92,6 +92,7 @@ def _health(
 def _dependency_for_provider(name: str) -> str | None:
     dependencies = {
         "akshare": "akshare",
+        "efinance": "efinance",
         "tushare": "tushare",
         "cninfo": None,
         "yfinance": "yfinance",

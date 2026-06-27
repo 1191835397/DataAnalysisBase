@@ -156,6 +156,27 @@ def test_run_industry_mapping_sync_passes_provider_override(
     assert seen_provider_names == ["tushare"]
 
 
+def test_run_industry_mapping_sync_can_override_to_efinance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.load_settings",
+        lambda: Settings(config_dir=ROOT_CONFIG, data_dir=data_dir),
+    )
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.EfinanceAdapter",
+        lambda: MockIndustryMappingProvider({"600519.SH": "白酒"}, name="efinance"),
+    )
+
+    result = run_industry_mapping_sync(config_dir=ROOT_CONFIG, provider_name="efinance")
+
+    assert result.status == "success"
+    assert result.source == "efinance"
+    assert result.records == 1
+
+
 class MockProvider:
     name = "mock"
 

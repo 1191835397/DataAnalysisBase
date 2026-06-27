@@ -12,6 +12,7 @@ from dataanalysisbase.domain.enums import DatasetType
 from dataanalysisbase.ingest import MarketBulkSync
 from dataanalysisbase.providers import (
     AkshareAdapter,
+    EfinanceAdapter,
     MarketDataProvider,
     ProviderRegistry,
     TushareAdapter,
@@ -175,6 +176,8 @@ def _build_industry_mapping_provider(
 ) -> IndustryMappingProvider:
     if name == "akshare":
         return AkshareAdapter()
+    if name == "efinance":
+        return EfinanceAdapter()
     if name == "tushare":
         token = tushare_token
         if provider_config.token_env and token is None:
