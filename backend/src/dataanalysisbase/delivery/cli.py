@@ -80,6 +80,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Preview local industry mapping refresh",
     )
     plan_sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
+    plan_sync_industry_mapping.add_argument("--provider", choices=["akshare", "tushare"])
     plan_sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
 
     sync_parser = subparsers.add_parser("sync", help="Run manual sync jobs")
@@ -94,6 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Refresh local security-to-industry mapping",
     )
     sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
+    sync_industry_mapping.add_argument("--provider", choices=["akshare", "tushare"])
     sync_industry_mapping.add_argument("--execute", action="store_true")
     sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
     return parser
@@ -152,7 +154,7 @@ def _plan_sync_market(args: argparse.Namespace) -> int:
 
 
 def _plan_sync_industry_mapping(args: argparse.Namespace) -> int:
-    plan = build_sync_industry_mapping_plan(args.config_dir)
+    plan = build_sync_industry_mapping_plan(args.config_dir, provider=args.provider)
     if args.json_output:
         print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
@@ -206,7 +208,7 @@ def _sync_market(args: argparse.Namespace) -> int:
 
 def _sync_industry_mapping(args: argparse.Namespace) -> int:
     if not args.execute:
-        plan = build_sync_industry_mapping_plan(args.config_dir)
+        plan = build_sync_industry_mapping_plan(args.config_dir, provider=args.provider)
         if args.json_output:
             print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
         else:
@@ -227,7 +229,7 @@ def _sync_industry_mapping(args: argparse.Namespace) -> int:
                 )
         return 0
 
-    result = run_industry_mapping_sync(config_dir=args.config_dir)
+    result = run_industry_mapping_sync(config_dir=args.config_dir, provider_name=args.provider)
     if args.json_output:
         print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:

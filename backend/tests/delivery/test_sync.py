@@ -116,7 +116,7 @@ def test_run_industry_mapping_sync_falls_back_to_secondary_provider(
     ]
     monkeypatch.setattr(
         "dataanalysisbase.delivery.sync._industry_mapping_providers",
-        lambda _providers, *, tushare_token: providers,
+        lambda _providers, *, provider_name, tushare_token: providers,
     )
 
     result = run_industry_mapping_sync(config_dir=ROOT_CONFIG)
@@ -127,6 +127,33 @@ def test_run_industry_mapping_sync_falls_back_to_secondary_provider(
     assert (data_dir / "industry_mapping.csv").read_text(encoding="utf-8") == (
         "security_id,industry\n600519.SH,白酒\n"
     )
+
+
+def test_run_industry_mapping_sync_passes_provider_override(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = tmp_path / "data"
+    seen_provider_names: list[str | None] = []
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync.load_settings",
+        lambda: Settings(config_dir=ROOT_CONFIG, data_dir=data_dir, tushare_token="token"),
+    )
+
+    def _providers(_providers, *, provider_name: str | None, tushare_token: str | None):
+        seen_provider_names.append(provider_name)
+        return [MockIndustryMappingProvider({"600519.SH": "白酒"}, name="tushare")]
+
+    monkeypatch.setattr(
+        "dataanalysisbase.delivery.sync._industry_mapping_providers",
+        _providers,
+    )
+
+    result = run_industry_mapping_sync(config_dir=ROOT_CONFIG, provider_name="tushare")
+
+    assert result.status == "success"
+    assert result.source == "tushare"
+    assert seen_provider_names == ["tushare"]
 
 
 class MockProvider:

@@ -58,6 +58,26 @@ def test_plan_sync_industry_mapping_json_outputs_dry_run_payload(capsys) -> None
     assert payload["will_write_file"] is False
 
 
+def test_plan_sync_industry_mapping_json_accepts_provider_override(capsys) -> None:
+    exit_code = main(
+        [
+            "plan",
+            "sync-industry-mapping",
+            "--config-dir",
+            str(ROOT_CONFIG),
+            "--provider",
+            "tushare",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert payload["provider"] == "tushare"
+
+
 def test_doctor_online_json_includes_provider_connectivity(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "dataanalysisbase.observability.system_status.build_provider_connectivity",

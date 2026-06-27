@@ -55,3 +55,10 @@ def test_sync_industry_mapping_plan_targets_configured_mapping_file() -> None:
     )
     assert plan.will_call_provider is False
     assert plan.will_write_file is False
+
+
+def test_sync_industry_mapping_plan_can_override_provider() -> None:
+    plan = build_sync_industry_mapping_plan(ROOT_CONFIG, provider="tushare")
+
+    assert plan.provider == "tushare"
+    assert [candidate.name for candidate in plan.provider_candidates] == ["akshare", "tushare"]

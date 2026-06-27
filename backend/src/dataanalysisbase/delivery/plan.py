@@ -126,7 +126,11 @@ def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
     )
 
 
-def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndustryMappingPlan:
+def build_sync_industry_mapping_plan(
+    config_dir: Path | None = None,
+    *,
+    provider: str | None = None,
+) -> SyncIndustryMappingPlan:
     """Build a read-only preview for refreshing the local industry mapping file."""
 
     settings = load_settings()
@@ -147,12 +151,7 @@ def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndu
         dataset=DatasetType.INDUSTRY_MAPPING,
         token_values={"TUSHARE_TOKEN": settings.tushare_token},
     )
-    enabled_candidates = [candidate for candidate in candidates if candidate.enabled]
-    selected_provider = (
-        min(enabled_candidates, key=lambda candidate: candidate.priority).name
-        if enabled_candidates
-        else "none"
-    )
+    selected_provider = _selected_provider(candidates, provider)
 
     return SyncIndustryMappingPlan(
         command="sync-industry-mapping",
@@ -169,6 +168,17 @@ def build_sync_industry_mapping_plan(config_dir: Path | None = None) -> SyncIndu
             "dry-run only; no industry mapping file is written",
             "real execution fetches provider-native industry board membership",
         ],
+    )
+
+
+def _selected_provider(candidates: list[ProviderCandidatePlan], provider: str | None) -> str:
+    if provider is not None:
+        return provider
+    enabled_candidates = [candidate for candidate in candidates if candidate.enabled]
+    return (
+        min(enabled_candidates, key=lambda candidate: candidate.priority).name
+        if enabled_candidates
+        else "none"
     )
 
 
