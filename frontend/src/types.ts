@@ -1,4 +1,4 @@
-export type DataStatus = "fresh" | "stale" | "failed" | "offline";
+export type DataStatus = "fresh" | "stale" | "partial" | "failed" | "offline";
 
 export type RuntimeStatus = {
   data_status: DataStatus;

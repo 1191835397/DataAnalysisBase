@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   ChevronLeft,
@@ -14,6 +15,8 @@ import {
 import { fetchIndustryStocks, fetchStocksPage, loadDashboardData, type DashboardData } from "./api";
 import {
   formatAmount,
+  dataStatusLabel,
+  dataStatusMessage,
   formatDateTime,
   formatInteger,
   formatNumber,
@@ -233,6 +236,7 @@ function App() {
           </div>
         </header>
 
+        <DataHealthNotice status={data?.status ?? null} />
         {error ? <div className="notice error">{error}</div> : null}
         {isLoading ? <div className="notice">加载市场快照...</div> : null}
 
@@ -419,8 +423,23 @@ function RuntimeSummary({ status }: { status: DashboardData["status"] | null }) 
   );
 }
 
+function DataHealthNotice({ status }: { status: DashboardData["status"] | null }) {
+  if (!status || status.data_status === "fresh") {
+    return null;
+  }
+  return (
+    <div className={`data-health-notice ${status.data_status}`}>
+      <AlertTriangle aria-hidden="true" size={18} />
+      <div>
+        <strong>{dataStatusLabel(status.data_status)}</strong>
+        <span>{dataStatusMessage(status)}</span>
+      </div>
+    </div>
+  );
+}
+
 function StatusPill({ status }: { status: DataStatus }) {
-  return <div className={`status-pill ${status}`}>{status}</div>;
+  return <div className={`status-pill ${status}`}>{dataStatusLabel(status)}</div>;
 }
 
 function StockControls({

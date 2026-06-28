@@ -1,4 +1,20 @@
-import type { RuntimeStatus } from "./types";
+import type { DataStatus, RuntimeStatus } from "./types";
+
+const dataStatusLabels: Record<DataStatus, string> = {
+  fresh: "正常",
+  stale: "已过期",
+  partial: "部分同步",
+  failed: "同步失败",
+  offline: "无数据"
+};
+
+const dataStatusMessages: Record<DataStatus, string> = {
+  fresh: "市场快照处于可用窗口内。",
+  stale: "最近快照已超过 freshness 阈值，页面仍展示最后一次成功数据。",
+  partial: "最近同步未完整覆盖全市场，部分列表或统计可能缺失。",
+  failed: "最近一次市场同步失败，页面仍展示可用的历史快照。",
+  offline: "当前没有可用市场快照，请先执行一次市场同步。"
+};
 
 export function latestRunCaption(status: RuntimeStatus): string {
   if (!status.last_market_run) {
@@ -7,6 +23,19 @@ export function latestRunCaption(status: RuntimeStatus): string {
   return `最近同步 ${status.last_market_run.status}，实际 ${formatInteger(
     status.last_market_run.actual
   )}，缺失 ${formatInteger(status.last_market_run.missing)}`;
+}
+
+export function dataStatusLabel(status: DataStatus): string {
+  return dataStatusLabels[status];
+}
+
+export function dataStatusMessage(status: RuntimeStatus): string {
+  const snapshot = formatDateTime(status.latest_snapshot_time);
+  const message = dataStatusMessages[status.data_status];
+  if (!status.last_market_run) {
+    return `${message} 快照：${snapshot}。`;
+  }
+  return `${message} ${latestRunCaption(status)}，快照：${snapshot}。`;
 }
 
 export function formatInteger(value: number): string {
