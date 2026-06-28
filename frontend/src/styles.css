@@ -192,6 +192,23 @@ h2 {
   opacity: 0.65;
 }
 
+.cancel-button {
+  height: 36px;
+  border: 1px solid rgba(155, 47, 47, 0.28);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #762828;
+  background: #fff7f5;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cancel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .notice {
   margin-bottom: 16px;
   border: 1px solid rgba(24, 34, 28, 0.14);

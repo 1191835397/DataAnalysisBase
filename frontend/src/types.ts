@@ -31,6 +31,7 @@ export type MarketSyncJob = {
   finished_at: string | null;
   result: SyncResult | null;
   error: string | null;
+  cancel_requested: boolean;
   elapsed_seconds: number;
   message: string;
 };

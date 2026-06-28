@@ -62,6 +62,12 @@ export function fetchMarketSyncJob(jobId: string): Promise<MarketSyncJob> {
   return fetchJson<MarketSyncJob>(`/api/v1/sync/market/${encodeURIComponent(jobId)}`);
 }
 
+export function cancelMarketSync(jobId: string): Promise<MarketSyncJob> {
+  return fetchJson<MarketSyncJob>(`/api/v1/sync/market/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST"
+  });
+}
+
 export function fetchLatestMarketSyncJob(): Promise<MarketSyncJob | null> {
   return fetchJsonOrEmpty<MarketSyncJob>("/api/v1/sync/market/latest");
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import {
+  cancelMarketSync,
   fetchMarketSyncJob,
   fetchLatestMarketSyncJob,
   fetchIndustryStocks,
@@ -99,6 +100,7 @@ function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
   const [syncTicker, setSyncTicker] = useState(0);
+  const [isCancellingSync, setIsCancellingSync] = useState(false);
   const isSyncing = syncJob?.status === "running";
 
   useEffect(() => {
@@ -235,7 +237,7 @@ function App() {
           setSyncJob(nextJob);
           if (nextJob.status === "running") {
             setSyncMessage(runningSyncMessage(nextJob));
-            setSyncMessageTone(nextJob.elapsed_seconds >= 180 ? "error" : "info");
+            setSyncMessageTone(nextJob.cancel_requested || nextJob.elapsed_seconds >= 180 ? "error" : "info");
             return;
           }
           handleCompletedSyncJob(nextJob);
@@ -274,7 +276,9 @@ function App() {
       return;
     }
     setSyncMessage(runningSyncMessage(syncJob));
-    setSyncMessageTone(syncElapsedSeconds(syncJob) >= 180 ? "error" : "info");
+    setSyncMessageTone(
+      syncJob.cancel_requested || syncElapsedSeconds(syncJob) >= 180 ? "error" : "info"
+    );
   }, [syncJob?.job_id, syncJob?.status, syncJob?.elapsed_seconds, syncTicker]);
 
   const breadth = useMemo(() => {
@@ -325,6 +329,7 @@ function App() {
             finished_at: null,
             result: null,
             error: null,
+            cancel_requested: false,
             elapsed_seconds: 0,
             message: "正在抓取 AKShare 全市场快照"
           });
@@ -334,6 +339,26 @@ function App() {
         }
         setSyncMessageTone("error");
         setSyncMessage(reason instanceof Error ? reason.message : "市场同步失败");
+      });
+  }
+
+  function handleCancelMarketSync() {
+    if (!syncJob || syncJob.status !== "running") {
+      return;
+    }
+    setIsCancellingSync(true);
+    cancelMarketSync(syncJob.job_id)
+      .then((job) => {
+        setSyncJob(job);
+        setSyncMessageTone("error");
+        setSyncMessage(runningSyncMessage(job));
+      })
+      .catch((reason: unknown) => {
+        setSyncMessageTone("error");
+        setSyncMessage(reason instanceof Error ? reason.message : "取消同步失败");
+      })
+      .finally(() => {
+        setIsCancellingSync(false);
       });
   }
 
@@ -405,6 +430,16 @@ function App() {
               <DatabaseZap aria-hidden="true" size={17} />
               <span>{isSyncing ? "同步中" : "同步"}</span>
             </button>
+            {isSyncing ? (
+              <button
+                className="cancel-button"
+                type="button"
+                disabled={isCancellingSync || syncJob?.cancel_requested}
+                onClick={handleCancelMarketSync}
+              >
+                取消
+              </button>
+            ) : null}
             <button
               className={`icon-button ${isLoading ? "is-spinning" : ""}`}
               type="button"

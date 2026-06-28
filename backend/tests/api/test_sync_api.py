@@ -118,6 +118,34 @@ def test_get_market_sync_returns_404_for_unknown_job() -> None:
     assert response.json()["detail"] == "market sync job not found"
 
 
+def test_cancel_market_sync_marks_running_job(monkeypatch) -> None:
+    active_job = MarketSyncJobStatus(
+        job_id="active-job",
+        status=RunStatus.RUNNING,
+        created_at=datetime.fromisoformat("2026-06-28T15:30:00+08:00"),
+    )
+    monkeypatch.setattr(api_main, "_market_sync_jobs", StaticJobStore(active_job))
+    client = TestClient(api_main.app)
+
+    response = client.post("/api/v1/sync/market/active-job/cancel")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "running"
+    assert payload["cancel_requested"] is True
+    assert payload["message"] == "已请求取消, 等待当前 provider 请求结束"
+
+
+def test_cancel_market_sync_returns_404_for_unknown_job(monkeypatch) -> None:
+    monkeypatch.setattr(api_main, "_market_sync_jobs", StaticJobStore(None))
+    client = TestClient(api_main.app)
+
+    response = client.post("/api/v1/sync/market/missing/cancel")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "market sync job not found"
+
+
 def test_market_sync_job_records_failed_exception(monkeypatch) -> None:
     def fake_run_market_sync(snapshot_time: datetime) -> SyncResult:
         raise RuntimeError("provider timeout")
@@ -159,3 +187,13 @@ class RejectingJobStore:
 
     def start(self, _background_tasks) -> MarketSyncJobStatus:
         raise MarketSyncAlreadyRunningError(self.active_job)
+
+
+class StaticJobStore:
+    def __init__(self, job: MarketSyncJobStatus | None) -> None:
+        self.job = job
+
+    def request_cancel(self, _job_id: str) -> MarketSyncJobStatus | None:
+        if self.job is None:
+            return None
+        return self.job.model_copy(update={"cancel_requested": True}).with_runtime_fields()

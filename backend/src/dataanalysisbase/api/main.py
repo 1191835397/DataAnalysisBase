@@ -94,6 +94,16 @@ def market_sync_status(job_id: str) -> MarketSyncJobStatus:
     return job
 
 
+@app.post("/api/v1/sync/market/{job_id}/cancel")
+def cancel_market_sync(job_id: str) -> MarketSyncJobStatus:
+    """Request cancellation for one API-triggered market sync job."""
+
+    job = _market_sync_jobs.request_cancel(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="market sync job not found")
+    return job
+
+
 @app.get("/api/v1/stocks")
 def stocks(
     page: int = Query(default=1, ge=1),

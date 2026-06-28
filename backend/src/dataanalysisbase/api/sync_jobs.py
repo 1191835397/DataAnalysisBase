@@ -26,6 +26,7 @@ class MarketSyncJobStatus(BaseModel):
     finished_at: datetime | None = None
     result: SyncResult | None = None
     error: str | None = None
+    cancel_requested: bool = False
     elapsed_seconds: int = 0
     message: str = "正在抓取 AKShare 全市场快照"
 
@@ -89,6 +90,21 @@ class MarketSyncJobStore:
             job = self._jobs.get(job_id)
             return _copy_job(job) if job is not None else None
 
+    def request_cancel(self, job_id: str) -> MarketSyncJobStatus | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            if job.status == RunStatus.RUNNING:
+                job = job.model_copy(
+                    update={
+                        "cancel_requested": True,
+                        "message": "已请求取消, 等待当前 provider 请求结束",
+                    }
+                )
+                self._jobs[job_id] = job
+            return _copy_job(job)
+
     def _run(self, job_id: str, snapshot_time: datetime) -> None:
         self._update(job_id, started_at=datetime.now().astimezone())
 
@@ -107,6 +123,19 @@ class MarketSyncJobStore:
                 missing=0,
                 snapshot_time=snapshot_time,
                 errors=[error],
+            )
+
+        with self._lock:
+            job = self._jobs.get(job_id)
+            cancel_requested = job.cancel_requested if job is not None else False
+
+        if cancel_requested and result.status != RunStatus.FAILED:
+            error = "market sync was cancelled by user"
+            result = result.model_copy(
+                update={
+                    "status": RunStatus.FAILED,
+                    "errors": [*result.errors, error],
+                }
             )
 
         self._update(
@@ -147,6 +176,10 @@ def _elapsed_seconds(job: MarketSyncJobStatus) -> int:
 
 
 def _job_message(job: MarketSyncJobStatus, elapsed_seconds: int) -> str:
+    if job.cancel_requested and job.status == RunStatus.RUNNING:
+        return "已请求取消, 等待当前 provider 请求结束"
+    if job.cancel_requested:
+        return "同步已取消"
     if job.status == RunStatus.RUNNING:
         if elapsed_seconds >= 300:
             return "市场同步耗时超过 5 分钟, 请检查上游数据源或后端日志"
