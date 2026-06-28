@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response, status
 
 from dataanalysisbase import __version__
+from dataanalysisbase.api.market_alerts import MarketAlert, get_market_alerts
 from dataanalysisbase.api.market_data import (
     IndustryItem,
     MarketOverview,
@@ -56,6 +57,13 @@ def system_status(online: bool = False) -> RuntimeStatus:
     """Return compact runtime status for diagnostics and UI status panels."""
 
     return build_runtime_status(include_online=online)
+
+
+@app.get("/api/v1/alerts/market")
+def market_alerts(limit: int = Query(default=50, ge=1, le=200)) -> list[MarketAlert]:
+    """Return current market surveillance alerts."""
+
+    return get_market_alerts(limit=limit)
 
 
 @app.get("/api/v1/market/overview")

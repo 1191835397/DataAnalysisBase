@@ -15,6 +15,7 @@ import {
 
 import {
   cancelMarketSync,
+  fetchMarketAlerts,
   fetchMarketSyncJob,
   fetchMarketSyncJobs,
   fetchLatestMarketSyncJob,
@@ -40,6 +41,7 @@ import {
 } from "./format";
 import type {
   DataStatus,
+  MarketAlert,
   MarketSyncJob,
   Page,
   SortOrder,
@@ -106,6 +108,10 @@ function App() {
   const [isSyncHistoryLoading, setIsSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryKey, setSyncHistoryKey] = useState(0);
+  const [alerts, setAlerts] = useState<MarketAlert[]>([]);
+  const [isAlertsLoading, setIsAlertsLoading] = useState(false);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [alertsKey, setAlertsKey] = useState(0);
   const isSyncing = syncJob?.status === "running";
 
   useEffect(() => {
@@ -189,6 +195,33 @@ function App() {
       isActive = false;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    let isActive = true;
+    setIsAlertsLoading(true);
+    setAlertsError(null);
+
+    fetchMarketAlerts(50)
+      .then((items) => {
+        if (isActive) {
+          setAlerts(items);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (isActive) {
+          setAlertsError(reason instanceof Error ? reason.message : "告警加载失败");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsAlertsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [alertsKey]);
 
   useEffect(() => {
     if (!selectedIndustry) {
@@ -343,6 +376,7 @@ function App() {
 
   function refreshDashboard() {
     setRefreshKey((value) => value + 1);
+    setAlertsKey((value) => value + 1);
   }
 
   function refreshSyncHistory() {
@@ -396,6 +430,15 @@ function App() {
       return;
     }
     startSyncJob(`正在重新执行同步任务，来源 ${job.job_id.slice(0, 8)}`);
+  }
+
+  function handleSelectAlert(alert: MarketAlert) {
+    if (!alert.security_id) {
+      return;
+    }
+    setActiveView("stocks");
+    setStockSearch(alert.security_id);
+    updateStockQuery({ q: alert.security_id, filter: undefined });
   }
 
   function handleCancelMarketSync() {
@@ -673,12 +716,13 @@ function App() {
           </section>
         ) : null}
 
-        {data && activeView === "alerts" ? (
-          <section className="empty-panel">
-            <p className="eyebrow">告警</p>
-            <h2>等待 surveillance 模块接入</h2>
-            <p>当前阶段先完成真实市场快照、行业排行和股票列表闭环。</p>
-          </section>
+        {activeView === "alerts" ? (
+          <AlertPanel
+            alerts={alerts}
+            isLoading={isAlertsLoading}
+            error={alertsError}
+            onSelectAlert={handleSelectAlert}
+          />
         ) : null}
       </section>
     </main>
@@ -915,8 +959,127 @@ function syncElapsedSecondsForDisplay(job: MarketSyncJob): number {
   return Math.max(Math.floor((Date.now() - createdAt) / 1000), job.elapsed_seconds);
 }
 
+function alertSeverityLabel(severity: MarketAlert["severity"]): string {
+  const labels: Record<MarketAlert["severity"], string> = {
+    high: "高",
+    medium: "中",
+    info: "信息"
+  };
+  return labels[severity];
+}
+
+function alertKindLabel(kind: MarketAlert["kind"]): string {
+  const labels: Record<MarketAlert["kind"], string> = {
+    data_stale: "数据过期",
+    sync_failed: "同步失败",
+    partial_sync: "部分同步",
+    offline: "无数据",
+    limit_up: "涨停",
+    limit_down: "跌停",
+    volume_surge: "放量",
+    extreme_move: "异常涨跌幅"
+  };
+  return labels[kind];
+}
+
+function alertTargetLabel(alert: MarketAlert): string {
+  if (!alert.security_id) {
+    return "系统";
+  }
+  return `${alert.name ?? "-"} ${alert.security_id}`;
+}
+
+function formatAlertValue(alert: MarketAlert): string {
+  if (alert.value === null) {
+    return "-";
+  }
+  if (alert.metric === "change_pct" || alert.kind === "limit_up" || alert.kind === "limit_down") {
+    return `${formatNumber(alert.value)}%`;
+  }
+  return formatNumber(alert.value);
+}
+
+function formatAlertThreshold(alert: MarketAlert): string {
+  if (alert.threshold === null) {
+    return "-";
+  }
+  if (alert.metric === "change_pct" || alert.kind === "limit_up" || alert.kind === "limit_down") {
+    return `${formatNumber(alert.threshold)}%`;
+  }
+  return formatNumber(alert.threshold);
+}
+
 function StatusPill({ status }: { status: DataStatus }) {
   return <div className={`status-pill ${status}`}>{dataStatusLabel(status)}</div>;
+}
+
+function AlertPanel({
+  alerts,
+  isLoading,
+  error,
+  onSelectAlert
+}: {
+  alerts: MarketAlert[];
+  isLoading: boolean;
+  error: string | null;
+  onSelectAlert: (alert: MarketAlert) => void;
+}) {
+  const highCount = alerts.filter((alert) => alert.severity === "high").length;
+  return (
+    <section className="table-panel" aria-label="市场告警">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">告警</p>
+          <h2>市场监控告警</h2>
+        </div>
+        <span>
+          {isLoading
+            ? "加载中"
+            : `${formatInteger(alerts.length)} 条 / ${formatInteger(highCount)} 高优先级`}
+        </span>
+      </div>
+      {error ? <div className="inline-notice error">{error}</div> : null}
+      {alerts.length === 0 && !isLoading ? <div className="inline-notice">暂无告警</div> : null}
+      {alerts.length > 0 ? (
+        <div className="table-wrap">
+          <table className="alerts-table">
+            <thead>
+              <tr>
+                <th>等级</th>
+                <th>类型</th>
+                <th>标的</th>
+                <th>数值</th>
+                <th>阈值</th>
+                <th>触发时间</th>
+                <th>原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              {alerts.map((alert) => (
+                <tr
+                  className={alert.security_id ? "clickable-row" : undefined}
+                  key={alert.alert_id}
+                  onClick={() => onSelectAlert(alert)}
+                >
+                  <td>
+                    <span className={`alert-severity ${alert.severity}`}>
+                      {alertSeverityLabel(alert.severity)}
+                    </span>
+                  </td>
+                  <td>{alertKindLabel(alert.kind)}</td>
+                  <td>{alertTargetLabel(alert)}</td>
+                  <td>{formatAlertValue(alert)}</td>
+                  <td>{formatAlertThreshold(alert)}</td>
+                  <td>{formatDateTime(alert.triggered_at)}</td>
+                  <td title={alert.message}>{alert.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 function StockControls({

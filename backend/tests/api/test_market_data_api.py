@@ -13,6 +13,8 @@ from dataanalysisbase.ingest import MarketBulkSync
 from dataanalysisbase.providers import MarketSnapshotBatch
 from dataanalysisbase.storage import AggregateRepo, DuckDBStore, SnapshotRepo
 
+ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
+
 
 def test_market_overview_endpoint_returns_latest_aggregate(
     monkeypatch,
@@ -130,6 +132,42 @@ def test_industry_stocks_endpoint_rejects_invalid_page_size() -> None:
     assert response.status_code == 422
 
 
+def test_market_alerts_endpoint_returns_system_and_stock_alerts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = _seed_market_data(tmp_path, include_alert_rows=True)
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/alerts/market?limit=20")
+
+    assert response.status_code == 200
+    payload = response.json()
+    kinds = {alert["kind"] for alert in payload}
+    assert "data_stale" in kinds
+    assert "limit_up" in kinds
+    assert "limit_down" in kinds
+    assert "volume_surge" in kinds
+    assert any(alert["security_id"] == "688001.SH" for alert in payload)
+
+
+def test_market_alerts_endpoint_returns_offline_alert_without_snapshot(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "missing.duckdb"
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/alerts/market")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload[0]["kind"] == "offline"
+    assert payload[0]["severity"] == "high"
+
+
 class MockProvider:
     name = "mock"
 
@@ -145,7 +183,12 @@ class MockProvider:
         )
 
 
-def _seed_market_data(tmp_path: Path, *, include_unknown_industry: bool = False) -> Path:
+def _seed_market_data(
+    tmp_path: Path,
+    *,
+    include_unknown_industry: bool = False,
+    include_alert_rows: bool = False,
+) -> Path:
     db_path = tmp_path / "analytics.duckdb"
     store = DuckDBStore(db_path)
     store.init_schema()
@@ -155,6 +198,27 @@ def _seed_market_data(tmp_path: Path, *, include_unknown_industry: bool = False)
             [
                 _row(snapshot_time, "600519.SH", "贵州茅台", 1.5, industry_code="TEST"),
                 _row(snapshot_time, "300750.SZ", "宁德时代", -2.0, industry_code="TEST"),
+                *(
+                    [
+                        _row(
+                            snapshot_time,
+                            "688001.SH",
+                            "华兴源创",
+                            10.2,
+                            industry_code="ALERT",
+                            volume_ratio=3.1,
+                        ),
+                        _row(
+                            snapshot_time,
+                            "000002.SZ",
+                            "万科A",
+                            -10.1,
+                            industry_code="ALERT",
+                        ),
+                    ]
+                    if include_alert_rows
+                    else []
+                ),
                 *(
                     [_row(snapshot_time, "000001.SZ", "平安银行", 0.1, industry_code=None)]
                     if include_unknown_industry
@@ -177,6 +241,7 @@ def _row(
     change_pct: float,
     *,
     industry_code: str | None,
+    volume_ratio: float = 1.5,
 ) -> MarketRow:
     return MarketRow(
         snapshot_time=snapshot_time,
@@ -189,7 +254,7 @@ def _row(
         volume=1000,
         amount=100000,
         turnover_rate=0.5,
-        volume_ratio=1.5,
+        volume_ratio=volume_ratio,
         pe_ttm=20,
         pb=3,
         market_cap=1000000,
@@ -199,8 +264,9 @@ def _row(
 
 def _patch_settings(monkeypatch, duckdb_path: Path) -> None:
     settings = Settings(
-        config_dir=Path("config"),
+        config_dir=ROOT_CONFIG,
         data_dir=duckdb_path.parent,
         duckdb_path=duckdb_path,
     )
     monkeypatch.setattr("dataanalysisbase.api.market_data.load_settings", lambda: settings)
+    monkeypatch.setattr("dataanalysisbase.api.market_alerts.load_settings", lambda: settings)

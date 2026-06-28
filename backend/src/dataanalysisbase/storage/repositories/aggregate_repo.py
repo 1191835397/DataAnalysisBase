@@ -162,6 +162,49 @@ class AggregateRepo(BaseRepo):
         )
         return rows
 
+    def get_alert_candidates(
+        self,
+        *,
+        limit_up_threshold: float,
+        limit_down_threshold: float,
+        volume_ratio_threshold: float,
+        extreme_change_threshold: float,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = self.store.query(
+            """
+            SELECT snapshot_time, security_id, name, price, change_pct, volume, amount,
+                   turnover_rate, volume_ratio, pe_ttm, pb, market_cap, industry_code,
+                   source, fetched_at
+            FROM latest_market_snapshot
+            WHERE change_pct >= ?
+               OR change_pct <= ?
+               OR volume_ratio >= ?
+               OR abs(change_pct) >= ?
+            ORDER BY
+                CASE
+                    WHEN change_pct >= ? OR change_pct <= ? THEN 0
+                    WHEN abs(change_pct) >= ? THEN 1
+                    ELSE 2
+                END,
+                abs(coalesce(change_pct, 0)) DESC,
+                coalesce(volume_ratio, 0) DESC,
+                security_id ASC
+            LIMIT ?
+            """,
+            [
+                limit_up_threshold,
+                limit_down_threshold,
+                volume_ratio_threshold,
+                extreme_change_threshold,
+                limit_up_threshold,
+                limit_down_threshold,
+                extreme_change_threshold,
+                limit,
+            ],
+        )
+        return rows
+
 
 def _build_stock_where(query: StockQuery) -> tuple[str, list[Any]]:
     clauses: list[str] = []

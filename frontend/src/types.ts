@@ -36,6 +36,32 @@ export type MarketSyncJob = {
   message: string;
 };
 
+export type AlertSeverity = "high" | "medium" | "info";
+
+export type MarketAlert = {
+  alert_id: string;
+  severity: AlertSeverity;
+  kind:
+    | "data_stale"
+    | "sync_failed"
+    | "partial_sync"
+    | "offline"
+    | "limit_up"
+    | "limit_down"
+    | "volume_surge"
+    | "extreme_move";
+  title: string;
+  message: string;
+  triggered_at: string;
+  security_id: string | null;
+  name: string | null;
+  industry_code: string | null;
+  metric: string | null;
+  value: number | null;
+  threshold: number | null;
+  snapshot_time: string | null;
+};
+
 export type MarketOverview = {
   snapshot_time: string;
   stock_count: number;
