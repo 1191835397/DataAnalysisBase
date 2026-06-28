@@ -7,11 +7,11 @@ from fastapi.testclient import TestClient
 from dataanalysisbase.api import main as api_main
 from dataanalysisbase.api.sync_jobs import (
     MarketSyncAlreadyRunningError,
-    MarketSyncJobStatus,
     MarketSyncJobStore,
 )
-from dataanalysisbase.domain.contracts import SyncResult
+from dataanalysisbase.domain.contracts import MarketSyncJobStatus, SyncResult
 from dataanalysisbase.domain.enums import RunStatus
+from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
 
 
 def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
@@ -171,14 +171,77 @@ def test_market_sync_job_reports_slow_running_message() -> None:
         status=RunStatus.RUNNING,
         created_at=datetime.now().astimezone() - timedelta(seconds=181),
         started_at=datetime.now().astimezone() - timedelta(seconds=180),
-    ).with_runtime_fields()
+    )
+    store = MarketSyncJobStore(
+        lambda snapshot_time: SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=0,
+            actual=0,
+            missing=0,
+            snapshot_time=snapshot_time,
+        )
+    )
+    store._jobs[job.job_id] = job
+    store._latest_job_id = job.job_id
+    refreshed = store.latest()
 
-    assert job.elapsed_seconds >= 180
-    assert job.message == "市场同步较慢, 可能是上游数据源响应慢"
+    assert refreshed is not None
+    assert refreshed.elapsed_seconds >= 180
+    assert refreshed.message == "市场同步较慢, 可能是上游数据源响应慢"
+
+
+def test_market_sync_job_store_restores_latest_persisted_job(tmp_path) -> None:
+    db_path = tmp_path / "jobs.duckdb"
+    store = DuckDBStore(db_path)
+    store.init_schema()
+    repo = SyncJobRepo(store)
+    created_at = datetime.fromisoformat("2026-06-28T15:30:00+08:00")
+    repo.upsert(
+        MarketSyncJobStatus(
+            job_id="persisted-job",
+            status=RunStatus.SUCCESS,
+            created_at=created_at,
+            finished_at=created_at,
+            result=SyncResult(
+                task="market_bulk_sync",
+                status=RunStatus.SUCCESS,
+                expected=1,
+                actual=1,
+                missing=0,
+                snapshot_time=created_at,
+            ),
+        )
+    )
+    store.close()
+
+    job_store = MarketSyncJobStore(
+        lambda snapshot_time: SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=0,
+            actual=0,
+            missing=0,
+            snapshot_time=snapshot_time,
+        ),
+        job_store_factory=lambda: _sync_job_repo(db_path),
+    )
+
+    latest = job_store.latest()
+    assert latest is not None
+    assert latest.job_id == "persisted-job"
+    assert latest.result is not None
+    assert latest.result.actual == 1
 
 
 def _patch_job_store(monkeypatch, sync_fn) -> None:
     monkeypatch.setattr(api_main, "_market_sync_jobs", MarketSyncJobStore(sync_fn))
+
+
+def _sync_job_repo(db_path) -> SyncJobRepo:
+    store = DuckDBStore(db_path)
+    store.init_schema()
+    return SyncJobRepo(store)
 
 
 class RejectingJobStore:
@@ -196,4 +259,9 @@ class StaticJobStore:
     def request_cancel(self, _job_id: str) -> MarketSyncJobStatus | None:
         if self.job is None:
             return None
-        return self.job.model_copy(update={"cancel_requested": True}).with_runtime_fields()
+        return self.job.model_copy(
+            update={
+                "cancel_requested": True,
+                "message": "已请求取消, 等待当前 provider 请求结束",
+            }
+        )

@@ -1,6 +1,12 @@
 """Domain models, enums, and contracts."""
 
-from dataanalysisbase.domain.contracts import FusionResult, MarketRow, RawDataset, SyncResult
+from dataanalysisbase.domain.contracts import (
+    FusionResult,
+    MarketRow,
+    MarketSyncJobStatus,
+    RawDataset,
+    SyncResult,
+)
 from dataanalysisbase.domain.enums import (
     AlertSeverity,
     DatasetType,
@@ -22,6 +28,7 @@ __all__ = [
     "Issuer",
     "Market",
     "MarketRow",
+    "MarketSyncJobStatus",
     "RawDataset",
     "RunStatus",
     "Security",

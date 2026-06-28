@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from dataanalysisbase.domain.contracts import MarketRow
+from dataanalysisbase.domain.contracts import MarketRow, MarketSyncJobStatus, SyncResult
 from dataanalysisbase.domain.enums import RunStatus
 from dataanalysisbase.storage import (
     AggregateRepo,
@@ -10,6 +10,7 @@ from dataanalysisbase.storage import (
     IndustryQuery,
     SnapshotRepo,
     StockQuery,
+    SyncJobRepo,
 )
 
 
@@ -82,6 +83,42 @@ def test_stock_query_unknown_industry_matches_null_industry(tmp_path: Path) -> N
     assert page.total == 1
     assert page.items[0]["security_id"] == "600519.SH"
     assert page.items[0]["industry_code"] is None
+
+
+def test_sync_job_repo_round_trips_latest_job(tmp_path: Path) -> None:
+    store = DuckDBStore(tmp_path / "test.duckdb")
+    store.init_schema()
+    repo = SyncJobRepo(store)
+    created_at = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    job = MarketSyncJobStatus(
+        job_id="job-1",
+        status=RunStatus.SUCCESS,
+        created_at=created_at,
+        started_at=created_at,
+        finished_at=created_at,
+        result=SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=2,
+            actual=2,
+            missing=0,
+            snapshot_time=created_at,
+        ),
+        message="done",
+        elapsed_seconds=12,
+    )
+
+    repo.upsert(job)
+
+    loaded = repo.get("job-1")
+    latest = repo.latest()
+    assert loaded is not None
+    assert loaded.job_id == "job-1"
+    assert loaded.result is not None
+    assert loaded.result.actual == 2
+    assert loaded.elapsed_seconds == 12
+    assert latest is not None
+    assert latest.job_id == "job-1"
 
 
 def _row(

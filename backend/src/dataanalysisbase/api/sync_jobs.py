@@ -8,37 +8,13 @@ from threading import Lock
 from uuid import uuid4
 
 from fastapi import BackgroundTasks
-from pydantic import BaseModel
 
-from dataanalysisbase.domain.contracts import SyncResult
+from dataanalysisbase.domain.contracts import MarketSyncJobStatus, SyncResult
 from dataanalysisbase.domain.enums import RunStatus
+from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
 
 MarketSyncFn = Callable[[datetime], SyncResult]
-
-
-class MarketSyncJobStatus(BaseModel):
-    """Observable state for one API-triggered market sync job."""
-
-    job_id: str
-    status: RunStatus
-    created_at: datetime
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    result: SyncResult | None = None
-    error: str | None = None
-    cancel_requested: bool = False
-    elapsed_seconds: int = 0
-    message: str = "正在抓取 AKShare 全市场快照"
-
-    def with_runtime_fields(self) -> MarketSyncJobStatus:
-        elapsed_seconds = _elapsed_seconds(self)
-        return self.model_copy(
-            update={
-                "elapsed_seconds": elapsed_seconds,
-                "message": _job_message(self, elapsed_seconds),
-            }
-        )
-
+JobStoreFactory = Callable[[], SyncJobRepo]
 
 
 class MarketSyncAlreadyRunningError(Exception):
@@ -52,14 +28,22 @@ class MarketSyncAlreadyRunningError(Exception):
 class MarketSyncJobStore:
     """Track market sync jobs and run at most one active job at a time."""
 
-    def __init__(self, sync_fn: MarketSyncFn) -> None:
+    def __init__(
+        self,
+        sync_fn: MarketSyncFn,
+        *,
+        job_store_factory: JobStoreFactory | None = None,
+    ) -> None:
         self._sync_fn = sync_fn
+        self._job_store_factory = job_store_factory
         self._lock = Lock()
         self._jobs: dict[str, MarketSyncJobStatus] = {}
         self._active_job_id: str | None = None
         self._latest_job_id: str | None = None
+        self._restored = job_store_factory is None
 
     def start(self, background_tasks: BackgroundTasks) -> MarketSyncJobStatus:
+        self._ensure_restored()
         snapshot_time = datetime.now().astimezone()
         job = MarketSyncJobStatus(
             job_id=uuid4().hex,
@@ -74,11 +58,13 @@ class MarketSyncJobStore:
             self._jobs[job.job_id] = job
             self._active_job_id = job.job_id
             self._latest_job_id = job.job_id
+            self._persist_locked(job)
 
         background_tasks.add_task(self._run, job.job_id, snapshot_time)
         return job
 
     def latest(self) -> MarketSyncJobStatus | None:
+        self._ensure_restored()
         with self._lock:
             if self._latest_job_id is None:
                 return None
@@ -86,11 +72,13 @@ class MarketSyncJobStore:
             return _copy_job(job) if job is not None else None
 
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
+        self._ensure_restored()
         with self._lock:
             job = self._jobs.get(job_id)
             return _copy_job(job) if job is not None else None
 
     def request_cancel(self, job_id: str) -> MarketSyncJobStatus | None:
+        self._ensure_restored()
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -103,6 +91,7 @@ class MarketSyncJobStore:
                     }
                 )
                 self._jobs[job_id] = job
+                self._persist_locked(job)
             return _copy_job(job)
 
     def _run(self, job_id: str, snapshot_time: datetime) -> None:
@@ -152,7 +141,9 @@ class MarketSyncJobStore:
             job = self._jobs.get(job_id)
             if job is None:
                 return
-            self._jobs[job_id] = job.model_copy(update=changes)
+            updated_job = job.model_copy(update=changes)
+            self._jobs[job_id] = updated_job
+            self._persist_locked(updated_job)
             if clear_active and self._active_job_id == job_id:
                 self._active_job_id = None
 
@@ -165,9 +156,55 @@ class MarketSyncJobStore:
             return None
         return job
 
+    def _ensure_restored(self) -> None:
+        if self._restored:
+            return
+        with self._lock:
+            if self._restored:
+                return
+            latest_job = self._load_latest_persisted_job()
+            if latest_job is not None:
+                self._jobs[latest_job.job_id] = latest_job
+                self._latest_job_id = latest_job.job_id
+            self._restored = True
+
+    def _load_latest_persisted_job(self) -> MarketSyncJobStatus | None:
+        repo, store = self._open_job_repo()
+        try:
+            repo.mark_interrupted_running()
+            return repo.latest()
+        finally:
+            store.close()
+
+    def _persist_locked(self, job: MarketSyncJobStatus) -> None:
+        if self._job_store_factory is None:
+            return
+        repo, store = self._open_job_repo()
+        try:
+            repo.upsert(_with_runtime_fields(job))
+        finally:
+            store.close()
+
+    def _open_job_repo(self) -> tuple[SyncJobRepo, DuckDBStore]:
+        repo = self._job_store_factory
+        if repo is None:
+            raise RuntimeError("job store factory is not configured")
+        sync_job_repo = repo()
+        return sync_job_repo, sync_job_repo.store
+
 
 def _copy_job(job: MarketSyncJobStatus) -> MarketSyncJobStatus:
-    return job.with_runtime_fields().model_copy(deep=True)
+    return _with_runtime_fields(job).model_copy(deep=True)
+
+
+def _with_runtime_fields(job: MarketSyncJobStatus) -> MarketSyncJobStatus:
+    elapsed_seconds = _elapsed_seconds(job)
+    return job.model_copy(
+        update={
+            "elapsed_seconds": elapsed_seconds,
+            "message": _job_message(job, elapsed_seconds),
+        }
+    )
 
 
 def _elapsed_seconds(job: MarketSyncJobStatus) -> int:

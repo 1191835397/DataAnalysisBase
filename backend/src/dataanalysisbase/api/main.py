@@ -15,15 +15,26 @@ from dataanalysisbase.api.market_data import (
 )
 from dataanalysisbase.api.sync_jobs import (
     MarketSyncAlreadyRunningError,
-    MarketSyncJobStatus,
     MarketSyncJobStore,
 )
+from dataanalysisbase.config_loader import load_settings
 from dataanalysisbase.delivery.sync import run_market_sync
+from dataanalysisbase.domain.contracts import MarketSyncJobStatus
 from dataanalysisbase.observability.system_status import RuntimeStatus, build_runtime_status
+from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
 from dataanalysisbase.storage.repositories.page import Page
 
 app = FastAPI(title="DataAnalysisBase API", version=__version__)
-_market_sync_jobs = MarketSyncJobStore(run_market_sync)
+
+
+def _sync_job_repo() -> SyncJobRepo:
+    settings = load_settings()
+    store = DuckDBStore(settings.duckdb_path)
+    store.init_schema()
+    return SyncJobRepo(store)
+
+
+_market_sync_jobs = MarketSyncJobStore(run_market_sync, job_store_factory=_sync_job_repo)
 
 
 @app.get("/health")

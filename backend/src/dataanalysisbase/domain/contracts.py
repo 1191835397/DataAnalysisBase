@@ -52,6 +52,21 @@ class SyncResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class MarketSyncJobStatus(BaseModel):
+    """Observable state for one API-triggered market sync job."""
+
+    job_id: str
+    status: RunStatus
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    result: SyncResult | None = None
+    error: str | None = None
+    cancel_requested: bool = False
+    elapsed_seconds: int = 0
+    message: str = "正在抓取 AKShare 全市场快照"
+
+
 class FusionResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 

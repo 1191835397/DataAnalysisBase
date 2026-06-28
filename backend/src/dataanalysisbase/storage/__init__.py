@@ -7,5 +7,13 @@ from dataanalysisbase.storage.repositories.aggregate_repo import (
     StockQuery,
 )
 from dataanalysisbase.storage.repositories.snapshot_repo import SnapshotRepo
+from dataanalysisbase.storage.repositories.sync_job_repo import SyncJobRepo
 
-__all__ = ["AggregateRepo", "DuckDBStore", "IndustryQuery", "SnapshotRepo", "StockQuery"]
+__all__ = [
+    "AggregateRepo",
+    "DuckDBStore",
+    "IndustryQuery",
+    "SnapshotRepo",
+    "StockQuery",
+    "SyncJobRepo",
+]
