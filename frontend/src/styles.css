@@ -500,6 +500,96 @@ th {
   text-overflow: ellipsis;
 }
 
+.sync-job-detail {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-top: 1px solid rgba(24, 34, 28, 0.1);
+  background: rgba(248, 250, 245, 0.76);
+}
+
+.sync-job-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sync-job-detail-header h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #213027;
+  font-size: 15px;
+}
+
+.retry-button {
+  height: 34px;
+  border: 1px solid rgba(24, 34, 28, 0.18);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #f7fbf4;
+  background: #1f4e38;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.retry-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sync-job-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-item {
+  min-width: 0;
+  border: 1px solid rgba(24, 34, 28, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.detail-item span {
+  display: block;
+  margin-bottom: 6px;
+  color: #597064;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detail-item strong {
+  display: block;
+  overflow: hidden;
+  color: #213027;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.sync-job-detail-message {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(24, 34, 28, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.sync-job-detail-message strong {
+  color: #597064;
+  font-size: 12px;
+}
+
+.sync-job-detail-message span {
+  overflow-wrap: anywhere;
+  color: #213027;
+  line-height: 1.5;
+}
+
 .sync-status {
   display: inline-flex;
   align-items: center;
@@ -585,6 +675,10 @@ tbody tr:hover {
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .sync-job-detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -625,6 +719,14 @@ tbody tr:hover {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-job-detail-header {
+    flex-direction: column;
+  }
+
+  .sync-job-detail-grid {
     grid-template-columns: 1fr;
   }
 

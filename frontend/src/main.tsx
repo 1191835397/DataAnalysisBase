@@ -350,8 +350,15 @@ function App() {
   }
 
   function handleStartMarketSync() {
+    startSyncJob();
+  }
+
+  function startSyncJob(message?: string) {
     setSyncMessage(null);
     setSyncMessageTone("info");
+    if (message) {
+      setSyncMessage(message);
+    }
 
     startMarketSync()
       .then((job) => {
@@ -382,6 +389,13 @@ function App() {
         setSyncMessageTone("error");
         setSyncMessage(reason instanceof Error ? reason.message : "市场同步失败");
       });
+  }
+
+  function handleRetryMarketSync(job: MarketSyncJob) {
+    if (isSyncing) {
+      return;
+    }
+    startSyncJob(`正在重新执行同步任务，来源 ${job.job_id.slice(0, 8)}`);
   }
 
   function handleCancelMarketSync() {
@@ -514,6 +528,8 @@ function App() {
           jobs={syncJobs}
           isLoading={isSyncHistoryLoading}
           error={syncHistoryError}
+          isRetryDisabled={isSyncing}
+          onRetry={handleRetryMarketSync}
         />
 
         {data && activeView === "overview" ? (
@@ -717,12 +733,19 @@ function DataHealthNotice({ status }: { status: DashboardData["status"] | null }
 function SyncHistoryPanel({
   jobs,
   isLoading,
-  error
+  error,
+  isRetryDisabled,
+  onRetry
 }: {
   jobs: MarketSyncJob[];
   isLoading: boolean;
   error: string | null;
+  isRetryDisabled: boolean;
+  onRetry: (job: MarketSyncJob) => void;
 }) {
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const selectedJob = jobs.find((job) => job.job_id === selectedJobId) ?? jobs[0] ?? null;
+
   return (
     <section className="table-panel sync-history-panel" aria-label="同步历史">
       <div className="section-heading">
@@ -750,7 +773,12 @@ function SyncHistoryPanel({
             </thead>
             <tbody>
               {jobs.map((job) => (
-                <tr key={job.job_id}>
+                <tr
+                  className="clickable-row"
+                  key={job.job_id}
+                  aria-selected={selectedJob?.job_id === job.job_id}
+                  onClick={() => setSelectedJobId(job.job_id)}
+                >
                   <td className="mono">{job.job_id.slice(0, 8)}</td>
                   <td>
                     <span className={`sync-status ${job.status}`}>{syncStatusLabel(job)}</span>
@@ -766,7 +794,69 @@ function SyncHistoryPanel({
           </table>
         </div>
       ) : null}
+      {selectedJob ? (
+        <SyncJobDetail
+          job={selectedJob}
+          isRetryDisabled={isRetryDisabled}
+          onRetry={() => onRetry(selectedJob)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function SyncJobDetail({
+  job,
+  isRetryDisabled,
+  onRetry
+}: {
+  job: MarketSyncJob;
+  isRetryDisabled: boolean;
+  onRetry: () => void;
+}) {
+  const canRetry = job.status !== "running" && !isRetryDisabled;
+  return (
+    <div className="sync-job-detail">
+      <div className="sync-job-detail-header">
+        <div>
+          <p className="eyebrow">任务详情</p>
+          <h3 className="mono">{job.job_id}</h3>
+        </div>
+        <button
+          className="retry-button"
+          type="button"
+          disabled={!canRetry}
+          onClick={onRetry}
+        >
+          重新同步
+        </button>
+      </div>
+      <div className="sync-job-detail-grid">
+        <DetailItem label="状态" value={syncStatusLabel(job)} />
+        <DetailItem label="创建" value={formatDateTime(job.created_at)} />
+        <DetailItem label="开始" value={formatDateTime(job.started_at)} />
+        <DetailItem label="结束" value={formatDateTime(job.finished_at)} />
+        <DetailItem label="耗时" value={formatDuration(syncElapsedSecondsForDisplay(job))} />
+        <DetailItem label="取消请求" value={job.cancel_requested ? "是" : "否"} />
+        <DetailItem label="实际 / 预期" value={syncJobResultSummary(job)} />
+        <DetailItem label="缺失" value={job.result ? formatInteger(job.result.missing) : "-"} />
+        <DetailItem label="快照" value={formatDateTime(job.result?.snapshot_time ?? null)} />
+        <DetailItem label="任务状态" value={job.result ? runStatusLabel(job.result.status) : "-"} />
+      </div>
+      <div className="sync-job-detail-message">
+        <strong>{job.error ? "错误" : "信息"}</strong>
+        <span>{syncJobDetailMessage(job)}</span>
+      </div>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="detail-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -774,13 +864,17 @@ function syncStatusLabel(job: MarketSyncJob): string {
   if (job.cancel_requested && job.status !== "running") {
     return "已取消";
   }
+  return runStatusLabel(job.status);
+}
+
+function runStatusLabel(status: MarketSyncJob["status"]): string {
   const labels: Record<MarketSyncJob["status"], string> = {
     running: "运行中",
     success: "成功",
     partial: "部分",
     failed: "失败"
   };
-  return labels[job.status];
+  return labels[status];
 }
 
 function syncJobResultSummary(job: MarketSyncJob): string {
@@ -796,6 +890,16 @@ function syncJobMessage(job: MarketSyncJob): string {
   }
   if (job.result) {
     return `缺失 ${formatInteger(job.result.missing)}`;
+  }
+  return job.message;
+}
+
+function syncJobDetailMessage(job: MarketSyncJob): string {
+  if (job.error) {
+    return job.error;
+  }
+  if (job.result?.errors.length) {
+    return job.result.errors.join("；");
   }
   return job.message;
 }
