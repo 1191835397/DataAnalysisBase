@@ -11,6 +11,18 @@ export type RuntimeStatus = {
   } | null;
 };
 
+export type RunStatus = "running" | "success" | "partial" | "failed";
+
+export type SyncResult = {
+  task: string;
+  status: RunStatus;
+  expected: number;
+  actual: number;
+  missing: number;
+  snapshot_time: string | null;
+  errors: string[];
+};
+
 export type MarketOverview = {
   snapshot_time: string;
   stock_count: number;

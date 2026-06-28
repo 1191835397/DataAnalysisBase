@@ -7,12 +7,19 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  DatabaseZap,
   Layers,
   RefreshCw,
   Search
 } from "lucide-react";
 
-import { fetchIndustryStocks, fetchStocksPage, loadDashboardData, type DashboardData } from "./api";
+import {
+  fetchIndustryStocks,
+  fetchStocksPage,
+  loadDashboardData,
+  runMarketSync,
+  type DashboardData
+} from "./api";
 import {
   formatAmount,
   dataStatusLabel,
@@ -22,9 +29,18 @@ import {
   formatNumber,
   formatPercent,
   formatSignedPercent,
-  latestRunCaption
+  latestRunCaption,
+  syncResultCaption
 } from "./format";
-import type { DataStatus, Page, SortOrder, StockFilter, StockItem, StockQuery } from "./types";
+import type {
+  DataStatus,
+  Page,
+  SortOrder,
+  StockFilter,
+  StockItem,
+  StockQuery,
+  SyncResult
+} from "./types";
 import "./styles.css";
 
 const navigation = [
@@ -75,6 +91,10 @@ function App() {
   const [stockPage, setStockPage] = useState<Page<StockItem> | null>(null);
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
 
   useEffect(() => {
     let isActive = true;
@@ -193,6 +213,32 @@ function App() {
     updateStockQuery({ q: stockSearch.trim() || undefined });
   }
 
+  function refreshDashboard() {
+    setRefreshKey((value) => value + 1);
+  }
+
+  function startMarketSync() {
+    setIsSyncing(true);
+    setSyncMessage(null);
+    setSyncResult(null);
+    setSyncMessageTone("info");
+
+    runMarketSync()
+      .then((result) => {
+        setSyncResult(result);
+        setSyncMessageTone(result.status === "success" ? "success" : "error");
+        setSyncMessage(syncResultCaption(result));
+        refreshDashboard();
+      })
+      .catch((reason: unknown) => {
+        setSyncMessageTone("error");
+        setSyncMessage(reason instanceof Error ? reason.message : "市场同步失败");
+      })
+      .finally(() => {
+        setIsSyncing(false);
+      });
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -225,11 +271,21 @@ function App() {
           <div className="topbar-actions">
             <StatusPill status={data?.status.data_status ?? "offline"} />
             <button
-              className="icon-button"
+              className="sync-button"
+              type="button"
+              disabled={isSyncing}
+              onClick={startMarketSync}
+            >
+              <DatabaseZap aria-hidden="true" size={17} />
+              <span>{isSyncing ? "同步中" : "同步"}</span>
+            </button>
+            <button
+              className={`icon-button ${isLoading ? "is-spinning" : ""}`}
               type="button"
               aria-label="刷新数据"
               title="刷新数据"
-              onClick={() => setRefreshKey((value) => value + 1)}
+              disabled={isLoading || isSyncing}
+              onClick={refreshDashboard}
             >
               <RefreshCw aria-hidden="true" size={18} />
             </button>
@@ -238,6 +294,12 @@ function App() {
 
         <DataHealthNotice status={data?.status ?? null} />
         {error ? <div className="notice error">{error}</div> : null}
+        {syncMessage ? (
+          <div className={`notice ${syncMessageTone === "info" ? "" : syncMessageTone}`}>
+            {syncMessage}
+          </div>
+        ) : null}
+        {isSyncing ? <div className="notice">正在同步全市场快照...</div> : null}
         {isLoading ? <div className="notice">加载市场快照...</div> : null}
 
         {data && activeView === "overview" ? (

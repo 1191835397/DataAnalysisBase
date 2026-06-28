@@ -1,4 +1,4 @@
-import type { DataStatus, RuntimeStatus } from "./types";
+import type { DataStatus, RuntimeStatus, SyncResult } from "./types";
 
 const dataStatusLabels: Record<DataStatus, string> = {
   fresh: "正常",
@@ -36,6 +36,13 @@ export function dataStatusMessage(status: RuntimeStatus): string {
     return `${message} 快照：${snapshot}。`;
   }
   return `${message} ${latestRunCaption(status)}，快照：${snapshot}。`;
+}
+
+export function syncResultCaption(result: SyncResult): string {
+  const snapshot = formatDateTime(result.snapshot_time);
+  return `同步 ${result.status}，实际 ${formatInteger(result.actual)} / 预期 ${formatInteger(
+    result.expected
+  )}，缺失 ${formatInteger(result.missing)}，快照 ${snapshot}`;
 }
 
 export function formatInteger(value: number): string {

@@ -167,6 +167,31 @@ h2 {
   opacity: 0.45;
 }
 
+.icon-button.is-spinning svg,
+.sync-button:disabled svg {
+  animation: spin 1s linear infinite;
+}
+
+.sync-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  border: 1px solid rgba(24, 34, 28, 0.18);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #f7fbf4;
+  background: #1f4e38;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sync-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .notice {
   margin-bottom: 16px;
   border: 1px solid rgba(24, 34, 28, 0.14);
@@ -180,6 +205,12 @@ h2 {
   border-color: rgba(155, 47, 47, 0.28);
   color: #762828;
   background: #fff7f5;
+}
+
+.notice.success {
+  border-color: rgba(31, 78, 56, 0.22);
+  color: #1f4e38;
+  background: #f3fbf5;
 }
 
 .data-health-notice {
@@ -447,6 +478,12 @@ tbody tr:hover {
 .down {
   color: #1f6d4a;
   font-weight: 700;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 1120px) {

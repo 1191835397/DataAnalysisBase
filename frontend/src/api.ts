@@ -1,4 +1,12 @@
-import type { IndustryItem, MarketOverview, Page, RuntimeStatus, StockItem, StockQuery } from "./types";
+import type {
+  IndustryItem,
+  MarketOverview,
+  Page,
+  RuntimeStatus,
+  StockItem,
+  StockQuery,
+  SyncResult
+} from "./types";
 
 export type DashboardData = {
   status: RuntimeStatus;
@@ -36,12 +44,28 @@ export function fetchIndustryStocks(
   );
 }
 
-export async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+export function runMarketSync(): Promise<SyncResult> {
+  return fetchJson<SyncResult>("/api/v1/sync/market", { method: "POST" });
+}
+
+export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`${url} returned ${response.status}`);
+    throw new Error(await responseErrorMessage(url, response));
   }
   return (await response.json()) as T;
+}
+
+async function responseErrorMessage(url: string, response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as { detail?: unknown };
+    if (typeof payload.detail === "string") {
+      return payload.detail;
+    }
+  } catch {
+    // Fall back to the status line below when the body is not JSON.
+  }
+  return `${url} returned ${response.status}`;
 }
 
 function buildQuery(query: StockQuery | Omit<StockQuery, "industry" | "q">): string {
