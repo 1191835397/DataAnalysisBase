@@ -17,6 +17,7 @@
 10. CODING_STANDARDS.md → 代码风格与工程原则（编码期强制）
 11. PRODUCT_OUTCOMES.md → 做完能看到什么
 12. ROADMAP.md          → 实现顺序
+13. OPERATIONS_RUNBOOK  → 当前待办、启动部署、验证与 Git 同步流程
 ```
 
 ## 文档列表
@@ -43,6 +44,7 @@
 | [FUSION_RECONCILE.md](./FUSION_RECONCILE.md) | 重点股多源融合与对账 |
 | [AGENT_INTELLIGENCE.md](./AGENT_INTELLIGENCE.md) | DeepSeek Agent 设计 |
 | [ROADMAP.md](./ROADMAP.md) | 设计阶段 + Phase A~E 路线图 |
+| [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md) | 当前待办、启动部署、验证与 Git 同步流程 |
 | [CONFIG_REFERENCE.md](./CONFIG_REFERENCE.md) | 同步调度与监管规则配置 |
 
 ## 配置示例

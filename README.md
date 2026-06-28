@@ -27,6 +27,7 @@
 | [docs/EXTERNAL_INTEGRATIONS.md](docs/EXTERNAL_INTEGRATIONS.md) | 外部金融开源工具分层接入策略 |
 | [docs/PRODUCT_OUTCOMES.md](docs/PRODUCT_OUTCOMES.md) | 最终效果说明 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 实施路线图 |
+| [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md) | 当前待办、启动部署、验证与 Git 同步流程 |
 
 ## 仓库
 
