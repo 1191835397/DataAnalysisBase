@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 
 import {
+  fetchMarketSyncJob,
   fetchIndustryStocks,
   fetchStocksPage,
   loadDashboardData,
-  runMarketSync,
+  startMarketSync,
+  SyncConflictError,
   type DashboardData
 } from "./api";
 import {
@@ -34,12 +36,12 @@ import {
 } from "./format";
 import type {
   DataStatus,
+  MarketSyncJob,
   Page,
   SortOrder,
   StockFilter,
   StockItem,
   StockQuery,
-  SyncResult
 } from "./types";
 import "./styles.css";
 
@@ -91,10 +93,10 @@ function App() {
   const [stockPage, setStockPage] = useState<Page<StockItem> | null>(null);
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncJob, setSyncJob] = useState<MarketSyncJob | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
+  const isSyncing = syncJob?.status === "running";
 
   useEffect(() => {
     let isActive = true;
@@ -188,6 +190,42 @@ function App() {
     };
   }, [stockQuery, refreshKey]);
 
+  useEffect(() => {
+    if (!syncJob || syncJob.status !== "running") {
+      return;
+    }
+
+    let isActive = true;
+    const poll = () => {
+      fetchMarketSyncJob(syncJob.job_id)
+        .then((nextJob) => {
+          if (!isActive) {
+            return;
+          }
+          setSyncJob(nextJob);
+          if (nextJob.status === "running") {
+            setSyncMessage("市场同步正在后台执行...");
+            return;
+          }
+          handleCompletedSyncJob(nextJob);
+        })
+        .catch((reason: unknown) => {
+          if (isActive) {
+            setSyncJob(null);
+            setSyncMessageTone("error");
+            setSyncMessage(reason instanceof Error ? reason.message : "同步状态查询失败");
+          }
+        });
+    };
+    const intervalId = window.setInterval(poll, 2500);
+    poll();
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [syncJob?.job_id, syncJob?.status]);
+
   const breadth = useMemo(() => {
     if (!data?.overview.stock_count) {
       return null;
@@ -217,26 +255,44 @@ function App() {
     setRefreshKey((value) => value + 1);
   }
 
-  function startMarketSync() {
-    setIsSyncing(true);
+  function handleStartMarketSync() {
     setSyncMessage(null);
-    setSyncResult(null);
     setSyncMessageTone("info");
 
-    runMarketSync()
-      .then((result) => {
-        setSyncResult(result);
-        setSyncMessageTone(result.status === "success" ? "success" : "error");
-        setSyncMessage(syncResultCaption(result));
-        refreshDashboard();
+    startMarketSync()
+      .then((job) => {
+        setSyncJob(job);
+        setSyncMessage("市场同步已开始...");
       })
       .catch((reason: unknown) => {
+        if (reason instanceof SyncConflictError) {
+          setSyncJob({
+            job_id: reason.jobId,
+            status: "running",
+            created_at: new Date().toISOString(),
+            started_at: null,
+            finished_at: null,
+            result: null,
+            error: null
+          });
+          setSyncMessageTone("info");
+          setSyncMessage("已有市场同步正在后台执行...");
+          return;
+        }
         setSyncMessageTone("error");
         setSyncMessage(reason instanceof Error ? reason.message : "市场同步失败");
-      })
-      .finally(() => {
-        setIsSyncing(false);
       });
+  }
+
+  function handleCompletedSyncJob(job: MarketSyncJob) {
+    if (job.result) {
+      setSyncMessageTone(job.result.status === "success" ? "success" : "error");
+      setSyncMessage(syncResultCaption(job.result));
+    } else {
+      setSyncMessageTone("error");
+      setSyncMessage(job.error || "市场同步失败");
+    }
+    refreshDashboard();
   }
 
   return (
@@ -274,7 +330,7 @@ function App() {
               className="sync-button"
               type="button"
               disabled={isSyncing}
-              onClick={startMarketSync}
+              onClick={handleStartMarketSync}
             >
               <DatabaseZap aria-hidden="true" size={17} />
               <span>{isSyncing ? "同步中" : "同步"}</span>

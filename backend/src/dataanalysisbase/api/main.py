@@ -1,10 +1,8 @@
 """FastAPI application entrypoint."""
 
-from datetime import datetime
-from threading import Lock
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, status
 
 from dataanalysisbase import __version__
 from dataanalysisbase.api.market_data import (
@@ -15,13 +13,17 @@ from dataanalysisbase.api.market_data import (
     get_market_overview,
     get_stocks_page,
 )
+from dataanalysisbase.api.sync_jobs import (
+    MarketSyncAlreadyRunningError,
+    MarketSyncJobStatus,
+    MarketSyncJobStore,
+)
 from dataanalysisbase.delivery.sync import run_market_sync
-from dataanalysisbase.domain.contracts import SyncResult
 from dataanalysisbase.observability.system_status import RuntimeStatus, build_runtime_status
 from dataanalysisbase.storage.repositories.page import Page
 
 app = FastAPI(title="DataAnalysisBase API", version=__version__)
-_market_sync_lock = Lock()
+_market_sync_jobs = MarketSyncJobStore(run_market_sync)
 
 
 @app.get("/health")
@@ -52,17 +54,30 @@ def market_overview() -> MarketOverview:
     return get_market_overview()
 
 
-@app.post("/api/v1/sync/market")
-def sync_market() -> SyncResult:
-    """Run one whole-market sync and return the sync result."""
-
-    if not _market_sync_lock.acquire(blocking=False):
-        raise HTTPException(status_code=409, detail="market sync already running")
+@app.post("/api/v1/sync/market", status_code=status.HTTP_202_ACCEPTED)
+def start_market_sync(background_tasks: BackgroundTasks) -> MarketSyncJobStatus:
+    """Start one whole-market sync job."""
 
     try:
-        return run_market_sync(datetime.now().astimezone())
-    finally:
-        _market_sync_lock.release()
+        return _market_sync_jobs.start(background_tasks)
+    except MarketSyncAlreadyRunningError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "market sync already running",
+                "job_id": exc.job.job_id,
+            },
+        ) from exc
+
+
+@app.get("/api/v1/sync/market/{job_id}")
+def market_sync_status(job_id: str) -> MarketSyncJobStatus:
+    """Return one API-triggered market sync job status."""
+
+    job = _market_sync_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="market sync job not found")
+    return job
 
 
 @app.get("/api/v1/stocks")

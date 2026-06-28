@@ -23,6 +23,16 @@ export type SyncResult = {
   errors: string[];
 };
 
+export type MarketSyncJob = {
+  job_id: string;
+  status: RunStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  result: SyncResult | null;
+  error: string | null;
+};
+
 export type MarketOverview = {
   snapshot_time: string;
   stock_count: number;
