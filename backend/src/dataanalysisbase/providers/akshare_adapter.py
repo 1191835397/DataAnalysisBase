@@ -90,12 +90,14 @@ class AkshareAdapter:
 
     def _fetch_industry_by_code(self) -> dict[str, str]:
         industry_by_code = self._fetch_industry_mapping_by_code()
+        if industry_by_code:
+            return industry_by_code
+
         name_fetcher, cons_fetcher = self._industry_fetchers()
         if name_fetcher is None or cons_fetcher is None:
             return industry_by_code
 
-        industry_by_code.update(self._fetch_board_industry_by_code(name_fetcher, cons_fetcher))
-        return industry_by_code
+        return self._fetch_board_industry_by_code(name_fetcher, cons_fetcher)
 
     def _fetch_board_industry_by_code(
         self,

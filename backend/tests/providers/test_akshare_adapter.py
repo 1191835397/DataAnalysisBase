@@ -198,7 +198,7 @@ def test_akshare_adapter_uses_industry_mapping_fallback() -> None:
     assert batch.rows[0].industry_code == "白酒"
 
 
-def test_akshare_adapter_prefers_board_industry_over_mapping_fallback() -> None:
+def test_akshare_adapter_prefers_local_mapping_over_board_industry() -> None:
     snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
     adapter = AkshareAdapter(
         spot_fetcher=lambda: FakeFrame(
@@ -215,6 +215,57 @@ def test_akshare_adapter_prefers_board_industry_over_mapping_fallback() -> None:
             [{"代码": "600519", "名称": "贵州茅台"}] if symbol == "白酒" else []
         ),
         industry_mapping_fetcher=lambda: {"600519.SH": "备用行业"},
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].industry_code == "备用行业"
+
+
+def test_akshare_adapter_skips_board_fetch_when_local_mapping_exists() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    board_calls: list[str] = []
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                }
+            ]
+        ),
+        industry_name_fetcher=lambda: board_calls.append("names")
+        or FakeFrame([{"板块名称": "白酒"}]),
+        industry_cons_fetcher=lambda symbol: board_calls.append(symbol) or FakeFrame(
+            [{"代码": "600519", "名称": "贵州茅台"}]
+        ),
+        industry_mapping_fetcher=lambda: {"600519.SH": "备用行业"},
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].industry_code == "备用行业"
+    assert board_calls == []
+
+
+def test_akshare_adapter_falls_back_to_board_fetch_when_local_mapping_is_empty() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                }
+            ]
+        ),
+        industry_name_fetcher=lambda: FakeFrame([{"板块名称": "白酒"}]),
+        industry_cons_fetcher=lambda symbol: FakeFrame(
+            [{"代码": "600519", "名称": "贵州茅台"}] if symbol == "白酒" else []
+        ),
+        industry_mapping_fetcher=lambda: {},
     )
 
     batch = adapter.fetch_market_snapshot(snapshot_time)
