@@ -45,6 +45,13 @@ export function syncResultCaption(result: SyncResult): string {
   )}，缺失 ${formatInteger(result.missing)}，快照 ${snapshot}`;
 }
 
+export function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(Math.floor(seconds), 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
 export function formatInteger(value: number): string {
   return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(value);
 }

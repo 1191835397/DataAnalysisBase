@@ -31,6 +31,8 @@ export type MarketSyncJob = {
   finished_at: string | null;
   result: SyncResult | null;
   error: string | null;
+  elapsed_seconds: number;
+  message: string;
 };
 
 export type MarketOverview = {

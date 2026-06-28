@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -44,6 +44,8 @@ def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
     assert status_payload["result"]["actual"] == 2
     assert status_payload["result"]["missing"] == 0
     assert status_payload["finished_at"] is not None
+    assert status_payload["elapsed_seconds"] >= 0
+    assert status_payload["message"] == "同步 success, 实际 2 / 预期 2, 缺失 0"
 
 
 def test_latest_market_sync_returns_latest_job(monkeypatch) -> None:
@@ -132,6 +134,19 @@ def test_market_sync_job_records_failed_exception(monkeypatch) -> None:
     assert status_payload["status"] == "failed"
     assert status_payload["error"] == "provider timeout"
     assert status_payload["result"]["errors"] == ["provider timeout"]
+    assert status_payload["message"] == "同步 failed, 实际 0 / 预期 0, 缺失 0"
+
+
+def test_market_sync_job_reports_slow_running_message() -> None:
+    job = MarketSyncJobStatus(
+        job_id="slow-job",
+        status=RunStatus.RUNNING,
+        created_at=datetime.now().astimezone() - timedelta(seconds=181),
+        started_at=datetime.now().astimezone() - timedelta(seconds=180),
+    ).with_runtime_fields()
+
+    assert job.elapsed_seconds >= 180
+    assert job.message == "市场同步较慢, 可能是上游数据源响应慢"
 
 
 def _patch_job_store(monkeypatch, sync_fn) -> None:

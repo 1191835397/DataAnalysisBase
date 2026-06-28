@@ -28,6 +28,7 @@ import {
   dataStatusLabel,
   dataStatusMessage,
   formatDateTime,
+  formatDuration,
   formatInteger,
   formatNumber,
   formatPercent,
@@ -97,6 +98,7 @@ function App() {
   const [syncJob, setSyncJob] = useState<MarketSyncJob | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
+  const [syncTicker, setSyncTicker] = useState(0);
   const isSyncing = syncJob?.status === "running";
 
   useEffect(() => {
@@ -232,7 +234,8 @@ function App() {
           }
           setSyncJob(nextJob);
           if (nextJob.status === "running") {
-            setSyncMessage("市场同步正在后台执行...");
+            setSyncMessage(runningSyncMessage(nextJob));
+            setSyncMessageTone(nextJob.elapsed_seconds >= 180 ? "error" : "info");
             return;
           }
           handleCompletedSyncJob(nextJob);
@@ -253,6 +256,26 @@ function App() {
       window.clearInterval(intervalId);
     };
   }, [syncJob?.job_id, syncJob?.status]);
+
+  useEffect(() => {
+    if (!isSyncing) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      setSyncTicker((value) => value + 1);
+    }, 1000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isSyncing]);
+
+  useEffect(() => {
+    if (!syncJob || syncJob.status !== "running") {
+      return;
+    }
+    setSyncMessage(runningSyncMessage(syncJob));
+    setSyncMessageTone(syncElapsedSeconds(syncJob) >= 180 ? "error" : "info");
+  }, [syncJob?.job_id, syncJob?.status, syncJob?.elapsed_seconds, syncTicker]);
 
   const breadth = useMemo(() => {
     if (!data?.overview.stock_count) {
@@ -290,7 +313,7 @@ function App() {
     startMarketSync()
       .then((job) => {
         setSyncJob(job);
-        setSyncMessage("市场同步已开始...");
+        setSyncMessage(runningSyncMessage(job));
       })
       .catch((reason: unknown) => {
         if (reason instanceof SyncConflictError) {
@@ -301,7 +324,9 @@ function App() {
             started_at: null,
             finished_at: null,
             result: null,
-            error: null
+            error: null,
+            elapsed_seconds: 0,
+            message: "正在抓取 AKShare 全市场快照"
           });
           setSyncMessageTone("info");
           setSyncMessage("已有市场同步正在后台执行...");
@@ -315,7 +340,7 @@ function App() {
   function handleCompletedSyncJob(job: MarketSyncJob, options: { refresh: boolean } = { refresh: true }) {
     if (job.result) {
       setSyncMessageTone(job.result.status === "success" ? "success" : "error");
-      setSyncMessage(syncResultCaption(job.result));
+      setSyncMessage(`${syncResultCaption(job.result)}，耗时 ${formatDuration(job.elapsed_seconds)}`);
     } else {
       setSyncMessageTone("error");
       setSyncMessage(job.error || "市场同步失败");
@@ -323,6 +348,21 @@ function App() {
     if (options.refresh) {
       refreshDashboard();
     }
+  }
+
+  function runningSyncMessage(job: MarketSyncJob): string {
+    return `${job.message}，已耗时 ${formatDuration(syncElapsedSeconds(job))}`;
+  }
+
+  function syncElapsedSeconds(job: MarketSyncJob): number {
+    if (job.status !== "running") {
+      return job.elapsed_seconds;
+    }
+    const createdAt = new Date(job.created_at).getTime();
+    if (Number.isNaN(createdAt)) {
+      return job.elapsed_seconds;
+    }
+    return Math.max(Math.floor((Date.now() - createdAt) / 1000), job.elapsed_seconds);
   }
 
   return (

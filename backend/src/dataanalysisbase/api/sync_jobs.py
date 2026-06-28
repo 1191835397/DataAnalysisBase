@@ -26,6 +26,18 @@ class MarketSyncJobStatus(BaseModel):
     finished_at: datetime | None = None
     result: SyncResult | None = None
     error: str | None = None
+    elapsed_seconds: int = 0
+    message: str = "正在抓取 AKShare 全市场快照"
+
+    def with_runtime_fields(self) -> MarketSyncJobStatus:
+        elapsed_seconds = _elapsed_seconds(self)
+        return self.model_copy(
+            update={
+                "elapsed_seconds": elapsed_seconds,
+                "message": _job_message(self, elapsed_seconds),
+            }
+        )
+
 
 
 class MarketSyncAlreadyRunningError(Exception):
@@ -70,12 +82,12 @@ class MarketSyncJobStore:
             if self._latest_job_id is None:
                 return None
             job = self._jobs.get(self._latest_job_id)
-            return job.model_copy(deep=True) if job is not None else None
+            return _copy_job(job) if job is not None else None
 
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
         with self._lock:
             job = self._jobs.get(job_id)
-            return job.model_copy(deep=True) if job is not None else None
+            return _copy_job(job) if job is not None else None
 
     def _run(self, job_id: str, snapshot_time: datetime) -> None:
         self._update(job_id, started_at=datetime.now().astimezone())
@@ -123,3 +135,29 @@ class MarketSyncJobStore:
             self._active_job_id = None
             return None
         return job
+
+
+def _copy_job(job: MarketSyncJobStatus) -> MarketSyncJobStatus:
+    return job.with_runtime_fields().model_copy(deep=True)
+
+
+def _elapsed_seconds(job: MarketSyncJobStatus) -> int:
+    end = job.finished_at or datetime.now().astimezone()
+    return max(round((end - job.created_at).total_seconds()), 0)
+
+
+def _job_message(job: MarketSyncJobStatus, elapsed_seconds: int) -> str:
+    if job.status == RunStatus.RUNNING:
+        if elapsed_seconds >= 300:
+            return "市场同步耗时超过 5 分钟, 请检查上游数据源或后端日志"
+        if elapsed_seconds >= 180:
+            return "市场同步较慢, 可能是上游数据源响应慢"
+        return "正在抓取 AKShare 全市场快照"
+    if job.result is not None:
+        return (
+            f"同步 {job.result.status.value}, 实际 {job.result.actual} / "
+            f"预期 {job.result.expected}, 缺失 {job.result.missing}"
+        )
+    if job.error:
+        return job.error
+    return f"同步 {job.status.value}"
