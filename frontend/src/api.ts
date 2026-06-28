@@ -1,6 +1,7 @@
 import type {
   IndustryItem,
   MarketAlert,
+  MarketAlertGroup,
   MarketOverview,
   MarketSyncJob,
   Page,
@@ -81,6 +82,11 @@ export function fetchMarketSyncJobs(limit = 20): Promise<MarketSyncJob[]> {
 export function fetchMarketAlerts(limit = 50): Promise<MarketAlert[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   return fetchJson<MarketAlert[]>(`/api/v1/alerts/market?${params.toString()}`);
+}
+
+export function fetchMarketAlertGroups(limit = 50): Promise<MarketAlertGroup[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return fetchJson<MarketAlertGroup[]>(`/api/v1/alerts/market/groups?${params.toString()}`);
 }
 
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

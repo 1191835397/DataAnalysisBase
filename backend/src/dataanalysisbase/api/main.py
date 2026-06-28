@@ -5,7 +5,12 @@ from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response, status
 
 from dataanalysisbase import __version__
-from dataanalysisbase.api.market_alerts import MarketAlert, get_market_alerts
+from dataanalysisbase.api.market_alerts import (
+    MarketAlert,
+    MarketAlertGroup,
+    get_market_alert_groups,
+    get_market_alerts,
+)
 from dataanalysisbase.api.market_data import (
     IndustryItem,
     MarketOverview,
@@ -64,6 +69,13 @@ def market_alerts(limit: int = Query(default=50, ge=1, le=200)) -> list[MarketAl
     """Return current market surveillance alerts."""
 
     return get_market_alerts(limit=limit)
+
+
+@app.get("/api/v1/alerts/market/groups")
+def market_alert_groups(limit: int = Query(default=50, ge=1, le=100)) -> list[MarketAlertGroup]:
+    """Return denoised market surveillance alert groups."""
+
+    return get_market_alert_groups(limit=limit)
 
 
 @app.get("/api/v1/market/overview")

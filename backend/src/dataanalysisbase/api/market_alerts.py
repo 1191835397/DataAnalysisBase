@@ -48,6 +48,25 @@ class MarketAlert(BaseModel):
     snapshot_time: datetime | None = None
 
 
+class MarketAlertGroup(BaseModel):
+    """Denoised alert group for one system condition or one security."""
+
+    model_config = ConfigDict(frozen=True)
+
+    group_id: str
+    severity: AlertSeverity
+    kinds: list[AlertKind]
+    title: str
+    message: str
+    triggered_at: datetime
+    alert_count: int
+    security_id: str | None = None
+    name: str | None = None
+    industry_code: str | None = None
+    snapshot_time: datetime | None = None
+    alerts: list[MarketAlert]
+
+
 def get_market_alerts(limit: int = 50) -> list[MarketAlert]:
     """Return current system and market snapshot alerts."""
 
@@ -78,6 +97,15 @@ def get_market_alerts(limit: int = 50) -> list[MarketAlert]:
 
     alerts.extend(_stock_alerts(rows, rules.rules))
     return alerts[:limit]
+
+
+def get_market_alert_groups(limit: int = 50) -> list[MarketAlertGroup]:
+    """Return current alerts grouped by system condition or security."""
+
+    alerts = get_market_alerts(limit=min(max(limit * 4, limit), 200))
+    groups = _group_alerts(alerts)
+    groups.sort(key=_group_sort_key, reverse=True)
+    return groups[:limit]
 
 
 def _system_alerts(status: RuntimeStatus) -> list[MarketAlert]:
@@ -144,6 +172,64 @@ def _stock_alerts(rows: list[dict[str, Any]], rules: dict[str, RuleConfig]) -> l
     for row in rows:
         alerts.extend(_row_alerts(row, rules))
     return alerts
+
+
+def _group_alerts(alerts: list[MarketAlert]) -> list[MarketAlertGroup]:
+    grouped: dict[str, list[MarketAlert]] = {}
+    for alert in alerts:
+        group_id = f"security:{alert.security_id}" if alert.security_id else alert.alert_id
+        grouped.setdefault(group_id, []).append(alert)
+    return [_alert_group(group_id, items) for group_id, items in grouped.items()]
+
+
+def _alert_group(group_id: str, alerts: list[MarketAlert]) -> MarketAlertGroup:
+    primary = max(alerts, key=lambda alert: _severity_rank(alert.severity))
+    kinds = list(dict.fromkeys(alert.kind for alert in alerts))
+    return MarketAlertGroup(
+        group_id=group_id,
+        severity=primary.severity,
+        kinds=kinds,
+        title=_group_title(primary, alerts),
+        message=_group_message(alerts),
+        triggered_at=max(alert.triggered_at for alert in alerts),
+        alert_count=len(alerts),
+        security_id=primary.security_id,
+        name=primary.name,
+        industry_code=primary.industry_code,
+        snapshot_time=primary.snapshot_time,
+        alerts=alerts,
+    )
+
+
+def _group_title(primary: MarketAlert, alerts: list[MarketAlert]) -> str:
+    if primary.security_id is None:
+        return primary.title
+    return f"{primary.name} 触发 {len(alerts)} 项告警"
+
+
+def _group_message(alerts: list[MarketAlert]) -> str:
+    if len(alerts) == 1:
+        return alerts[0].message
+    titles = "、".join(dict.fromkeys(alert.title for alert in alerts))
+    return f"触发项: {titles}"
+
+
+def _group_sort_key(group: MarketAlertGroup) -> tuple[int, datetime, int, str]:
+    return (
+        _severity_rank(group.severity),
+        group.triggered_at,
+        group.alert_count,
+        group.group_id,
+    )
+
+
+def _severity_rank(severity: AlertSeverity) -> int:
+    ranks = {
+        AlertSeverity.INFO: 1,
+        AlertSeverity.MEDIUM: 2,
+        AlertSeverity.HIGH: 3,
+    }
+    return ranks[severity]
 
 
 def _row_alerts(row: dict[str, Any], rules: dict[str, RuleConfig]) -> list[MarketAlert]:

@@ -152,6 +152,26 @@ def test_market_alerts_endpoint_returns_system_and_stock_alerts(
     assert any(alert["security_id"] == "688001.SH" for alert in payload)
 
 
+def test_market_alert_groups_endpoint_deduplicates_security_alerts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = _seed_market_data(tmp_path, include_alert_rows=True)
+    _patch_settings(monkeypatch, db_path)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/alerts/market/groups?limit=20")
+
+    assert response.status_code == 200
+    payload = response.json()
+    security_group = next(
+        group for group in payload if group["security_id"] == "688001.SH"
+    )
+    assert security_group["severity"] == "high"
+    assert set(security_group["kinds"]) >= {"limit_up", "volume_surge", "extreme_move"}
+    assert security_group["alert_count"] == len(security_group["alerts"])
+
+
 def test_market_alerts_endpoint_returns_offline_alert_without_snapshot(
     monkeypatch,
     tmp_path: Path,

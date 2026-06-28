@@ -15,7 +15,7 @@ import {
 
 import {
   cancelMarketSync,
-  fetchMarketAlerts,
+  fetchMarketAlertGroups,
   fetchMarketSyncJob,
   fetchMarketSyncJobs,
   fetchLatestMarketSyncJob,
@@ -42,6 +42,7 @@ import {
 import type {
   DataStatus,
   MarketAlert,
+  MarketAlertGroup,
   MarketSyncJob,
   Page,
   SortOrder,
@@ -76,6 +77,24 @@ const stockSortOptions = [
 ];
 
 type ActiveView = (typeof navigation)[number]["key"];
+type AlertSeverityFilter = MarketAlert["severity"] | "all";
+type AlertKindFilter = MarketAlert["kind"] | "system" | "all";
+
+const alertSeverityOptions: Array<{ value: AlertSeverityFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "high", label: "高" },
+  { value: "medium", label: "中" },
+  { value: "info", label: "信息" }
+];
+
+const alertKindOptions: Array<{ value: AlertKindFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "system", label: "系统" },
+  { value: "limit_up", label: "涨停" },
+  { value: "limit_down", label: "跌停" },
+  { value: "volume_surge", label: "放量" },
+  { value: "extreme_move", label: "异常涨跌幅" }
+];
 
 function App() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -108,7 +127,7 @@ function App() {
   const [isSyncHistoryLoading, setIsSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryKey, setSyncHistoryKey] = useState(0);
-  const [alerts, setAlerts] = useState<MarketAlert[]>([]);
+  const [alertGroups, setAlertGroups] = useState<MarketAlertGroup[]>([]);
   const [isAlertsLoading, setIsAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
   const [alertsKey, setAlertsKey] = useState(0);
@@ -201,10 +220,10 @@ function App() {
     setIsAlertsLoading(true);
     setAlertsError(null);
 
-    fetchMarketAlerts(50)
+    fetchMarketAlertGroups(50)
       .then((items) => {
         if (isActive) {
-          setAlerts(items);
+          setAlertGroups(items);
         }
       })
       .catch((reason: unknown) => {
@@ -432,13 +451,13 @@ function App() {
     startSyncJob(`正在重新执行同步任务，来源 ${job.job_id.slice(0, 8)}`);
   }
 
-  function handleSelectAlert(alert: MarketAlert) {
-    if (!alert.security_id) {
+  function handleSelectAlert(group: MarketAlertGroup) {
+    if (!group.security_id) {
       return;
     }
     setActiveView("stocks");
-    setStockSearch(alert.security_id);
-    updateStockQuery({ q: alert.security_id, filter: undefined });
+    setStockSearch(group.security_id);
+    updateStockQuery({ q: group.security_id, filter: undefined });
   }
 
   function handleCancelMarketSync() {
@@ -718,7 +737,7 @@ function App() {
 
         {activeView === "alerts" ? (
           <AlertPanel
-            alerts={alerts}
+            groups={alertGroups}
             isLoading={isAlertsLoading}
             error={alertsError}
             onSelectAlert={handleSelectAlert}
@@ -982,11 +1001,25 @@ function alertKindLabel(kind: MarketAlert["kind"]): string {
   return labels[kind];
 }
 
-function alertTargetLabel(alert: MarketAlert): string {
-  if (!alert.security_id) {
+function alertGroupTargetLabel(group: MarketAlertGroup): string {
+  if (!group.security_id) {
     return "系统";
   }
-  return `${alert.name ?? "-"} ${alert.security_id}`;
+  return `${group.name ?? "-"} ${group.security_id}`;
+}
+
+function alertGroupKindLabel(group: MarketAlertGroup): string {
+  return group.kinds.map(alertKindLabel).join(" / ");
+}
+
+function groupMatchesKind(group: MarketAlertGroup, kind: AlertKindFilter): boolean {
+  if (kind === "all") {
+    return true;
+  }
+  if (kind === "system") {
+    return group.security_id === null;
+  }
+  return group.kinds.includes(kind);
 }
 
 function formatAlertValue(alert: MarketAlert): string {
@@ -1014,17 +1047,25 @@ function StatusPill({ status }: { status: DataStatus }) {
 }
 
 function AlertPanel({
-  alerts,
+  groups,
   isLoading,
   error,
   onSelectAlert
 }: {
-  alerts: MarketAlert[];
+  groups: MarketAlertGroup[];
   isLoading: boolean;
   error: string | null;
-  onSelectAlert: (alert: MarketAlert) => void;
+  onSelectAlert: (group: MarketAlertGroup) => void;
 }) {
-  const highCount = alerts.filter((alert) => alert.severity === "high").length;
+  const [severityFilter, setSeverityFilter] = useState<AlertSeverityFilter>("all");
+  const [kindFilter, setKindFilter] = useState<AlertKindFilter>("all");
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const visibleGroups = groups.filter(
+    (group) =>
+      (severityFilter === "all" || group.severity === severityFilter) &&
+      (kindFilter === "all" || groupMatchesKind(group, kindFilter))
+  );
+  const highCount = groups.filter((group) => group.severity === "high").length;
   return (
     <section className="table-panel" aria-label="市场告警">
       <div className="section-heading">
@@ -1035,12 +1076,42 @@ function AlertPanel({
         <span>
           {isLoading
             ? "加载中"
-            : `${formatInteger(alerts.length)} 条 / ${formatInteger(highCount)} 高优先级`}
+            : `${formatInteger(groups.length)} 组 / ${formatInteger(highCount)} 高优先级`}
         </span>
       </div>
+      <div className="controls-bar alert-controls">
+        <div className="segmented-control" aria-label="告警等级筛选">
+          {alertSeverityOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={severityFilter === option.value}
+              onClick={() => setSeverityFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <label>
+          类型
+          <select
+            value={kindFilter}
+            onChange={(event) => setKindFilter(event.target.value as AlertKindFilter)}
+          >
+            {alertKindOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       {error ? <div className="inline-notice error">{error}</div> : null}
-      {alerts.length === 0 && !isLoading ? <div className="inline-notice">暂无告警</div> : null}
-      {alerts.length > 0 ? (
+      {groups.length === 0 && !isLoading ? <div className="inline-notice">暂无告警</div> : null}
+      {groups.length > 0 && visibleGroups.length === 0 ? (
+        <div className="inline-notice">当前筛选下暂无告警</div>
+      ) : null}
+      {visibleGroups.length > 0 ? (
         <div className="table-wrap">
           <table className="alerts-table">
             <thead>
@@ -1048,37 +1119,100 @@ function AlertPanel({
                 <th>等级</th>
                 <th>类型</th>
                 <th>标的</th>
-                <th>数值</th>
-                <th>阈值</th>
+                <th>触发项</th>
                 <th>触发时间</th>
                 <th>原因</th>
               </tr>
             </thead>
             <tbody>
-              {alerts.map((alert) => (
-                <tr
-                  className={alert.security_id ? "clickable-row" : undefined}
-                  key={alert.alert_id}
-                  onClick={() => onSelectAlert(alert)}
-                >
-                  <td>
-                    <span className={`alert-severity ${alert.severity}`}>
-                      {alertSeverityLabel(alert.severity)}
-                    </span>
-                  </td>
-                  <td>{alertKindLabel(alert.kind)}</td>
-                  <td>{alertTargetLabel(alert)}</td>
-                  <td>{formatAlertValue(alert)}</td>
-                  <td>{formatAlertThreshold(alert)}</td>
-                  <td>{formatDateTime(alert.triggered_at)}</td>
-                  <td title={alert.message}>{alert.message}</td>
-                </tr>
+              {visibleGroups.map((group) => (
+                <React.Fragment key={group.group_id}>
+                  <tr
+                    className={group.security_id ? "clickable-row" : undefined}
+                    aria-selected={expandedGroupId === group.group_id}
+                    onClick={() => {
+                      setExpandedGroupId(
+                        expandedGroupId === group.group_id ? null : group.group_id
+                      );
+                    }}
+                    onDoubleClick={() => onSelectAlert(group)}
+                  >
+                    <td>
+                      <span className={`alert-severity ${group.severity}`}>
+                        {alertSeverityLabel(group.severity)}
+                      </span>
+                    </td>
+                    <td>{alertGroupKindLabel(group)}</td>
+                    <td>
+                      {group.security_id ? (
+                        <button
+                          className="link-button"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSelectAlert(group);
+                          }}
+                        >
+                          {alertGroupTargetLabel(group)}
+                        </button>
+                      ) : (
+                        alertGroupTargetLabel(group)
+                      )}
+                    </td>
+                    <td>{formatInteger(group.alert_count)}</td>
+                    <td>{formatDateTime(group.triggered_at)}</td>
+                    <td title={group.message}>{group.message}</td>
+                  </tr>
+                  {expandedGroupId === group.group_id ? (
+                    <tr className="alert-detail-row">
+                      <td colSpan={6}>
+                        <AlertGroupDetails group={group} onSelectAlert={onSelectAlert} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AlertGroupDetails({
+  group,
+  onSelectAlert
+}: {
+  group: MarketAlertGroup;
+  onSelectAlert: (group: MarketAlertGroup) => void;
+}) {
+  return (
+    <div className="alert-group-detail">
+      <div className="alert-group-detail-header">
+        <div>
+          <strong>{group.title}</strong>
+          <span>{group.message}</span>
+        </div>
+        {group.security_id ? (
+          <button className="retry-button" type="button" onClick={() => onSelectAlert(group)}>
+            定位
+          </button>
+        ) : null}
+      </div>
+      <div className="alert-trigger-list">
+        {group.alerts.map((alert) => (
+          <div className="alert-trigger" key={alert.alert_id}>
+            <span className={`alert-severity ${alert.severity}`}>
+              {alertSeverityLabel(alert.severity)}
+            </span>
+            <strong>{alertKindLabel(alert.kind)}</strong>
+            <span>{formatAlertValue(alert)} / {formatAlertThreshold(alert)}</span>
+            <p>{alert.message}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

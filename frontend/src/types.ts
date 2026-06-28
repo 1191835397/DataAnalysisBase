@@ -62,6 +62,21 @@ export type MarketAlert = {
   snapshot_time: string | null;
 };
 
+export type MarketAlertGroup = {
+  group_id: string;
+  severity: AlertSeverity;
+  kinds: MarketAlert["kind"][];
+  title: string;
+  message: string;
+  triggered_at: string;
+  alert_count: number;
+  security_id: string | null;
+  name: string | null;
+  industry_code: string | null;
+  snapshot_time: string | null;
+  alerts: MarketAlert[];
+};
+
 export type MarketOverview = {
   snapshot_time: string;
   stock_count: number;
