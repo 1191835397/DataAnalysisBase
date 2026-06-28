@@ -62,8 +62,23 @@ export function fetchMarketSyncJob(jobId: string): Promise<MarketSyncJob> {
   return fetchJson<MarketSyncJob>(`/api/v1/sync/market/${encodeURIComponent(jobId)}`);
 }
 
+export function fetchLatestMarketSyncJob(): Promise<MarketSyncJob | null> {
+  return fetchJsonOrEmpty<MarketSyncJob>("/api/v1/sync/market/latest");
+}
+
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
+  if (!response.ok) {
+    throw await responseError(url, response);
+  }
+  return (await response.json()) as T;
+}
+
+async function fetchJsonOrEmpty<T>(url: string, init?: RequestInit): Promise<T | null> {
+  const response = await fetch(url, init);
+  if (response.status === 204) {
+    return null;
+  }
   if (!response.ok) {
     throw await responseError(url, response);
   }

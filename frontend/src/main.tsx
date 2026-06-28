@@ -15,6 +15,7 @@ import {
 
 import {
   fetchMarketSyncJob,
+  fetchLatestMarketSyncJob,
   fetchIndustryStocks,
   fetchStocksPage,
   loadDashboardData,
@@ -97,6 +98,33 @@ function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
   const isSyncing = syncJob?.status === "running";
+
+  useEffect(() => {
+    let isActive = true;
+    fetchLatestMarketSyncJob()
+      .then((job) => {
+        if (!isActive || !job) {
+          return;
+        }
+        setSyncJob(job);
+        if (job.status === "running") {
+          setSyncMessageTone("info");
+          setSyncMessage("检测到后台市场同步正在执行...");
+          return;
+        }
+        handleCompletedSyncJob(job, { refresh: false });
+      })
+      .catch((reason: unknown) => {
+        if (isActive) {
+          setSyncMessageTone("error");
+          setSyncMessage(reason instanceof Error ? reason.message : "最近同步任务加载失败");
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -284,7 +312,7 @@ function App() {
       });
   }
 
-  function handleCompletedSyncJob(job: MarketSyncJob) {
+  function handleCompletedSyncJob(job: MarketSyncJob, options: { refresh: boolean } = { refresh: true }) {
     if (job.result) {
       setSyncMessageTone(job.result.status === "success" ? "success" : "error");
       setSyncMessage(syncResultCaption(job.result));
@@ -292,7 +320,9 @@ function App() {
       setSyncMessageTone("error");
       setSyncMessage(job.error || "市场同步失败");
     }
-    refreshDashboard();
+    if (options.refresh) {
+      refreshDashboard();
+    }
   }
 
   return (

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, status
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response, status
 
 from dataanalysisbase import __version__
 from dataanalysisbase.api.market_data import (
@@ -68,6 +68,20 @@ def start_market_sync(background_tasks: BackgroundTasks) -> MarketSyncJobStatus:
                 "job_id": exc.job.job_id,
             },
         ) from exc
+
+
+@app.get(
+    "/api/v1/sync/market/latest",
+    response_model=MarketSyncJobStatus,
+    responses={204: {"description": "No API-triggered market sync job is available"}},
+)
+def latest_market_sync_status() -> MarketSyncJobStatus | Response:
+    """Return the latest API-triggered market sync job status, if one exists."""
+
+    job = _market_sync_jobs.latest()
+    if job is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return job
 
 
 @app.get("/api/v1/sync/market/{job_id}")

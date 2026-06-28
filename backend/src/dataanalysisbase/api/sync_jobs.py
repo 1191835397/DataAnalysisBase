@@ -44,6 +44,7 @@ class MarketSyncJobStore:
         self._lock = Lock()
         self._jobs: dict[str, MarketSyncJobStatus] = {}
         self._active_job_id: str | None = None
+        self._latest_job_id: str | None = None
 
     def start(self, background_tasks: BackgroundTasks) -> MarketSyncJobStatus:
         snapshot_time = datetime.now().astimezone()
@@ -59,9 +60,17 @@ class MarketSyncJobStore:
                 raise MarketSyncAlreadyRunningError(active_job)
             self._jobs[job.job_id] = job
             self._active_job_id = job.job_id
+            self._latest_job_id = job.job_id
 
         background_tasks.add_task(self._run, job.job_id, snapshot_time)
         return job
+
+    def latest(self) -> MarketSyncJobStatus | None:
+        with self._lock:
+            if self._latest_job_id is None:
+                return None
+            job = self._jobs.get(self._latest_job_id)
+            return job.model_copy(deep=True) if job is not None else None
 
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
         with self._lock:

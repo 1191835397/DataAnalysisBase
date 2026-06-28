@@ -46,6 +46,50 @@ def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
     assert status_payload["finished_at"] is not None
 
 
+def test_latest_market_sync_returns_latest_job(monkeypatch) -> None:
+    def fake_run_market_sync(snapshot_time: datetime) -> SyncResult:
+        return SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=3,
+            actual=3,
+            missing=0,
+            snapshot_time=snapshot_time,
+        )
+
+    _patch_job_store(monkeypatch, fake_run_market_sync)
+    client = TestClient(api_main.app)
+
+    start_response = client.post("/api/v1/sync/market")
+    job_id = start_response.json()["job_id"]
+    latest_response = client.get("/api/v1/sync/market/latest")
+
+    assert latest_response.status_code == 200
+    payload = latest_response.json()
+    assert payload["job_id"] == job_id
+    assert payload["status"] == "success"
+    assert payload["result"]["actual"] == 3
+
+
+def test_latest_market_sync_returns_204_without_job(monkeypatch) -> None:
+    _patch_job_store(
+        monkeypatch,
+        lambda snapshot_time: SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=0,
+            actual=0,
+            missing=0,
+            snapshot_time=snapshot_time,
+        ),
+    )
+    client = TestClient(api_main.app)
+
+    response = client.get("/api/v1/sync/market/latest")
+
+    assert response.status_code == 204
+
+
 def test_start_market_sync_rejects_concurrent_run(monkeypatch) -> None:
     active_job = MarketSyncJobStatus(
         job_id="active-job",
