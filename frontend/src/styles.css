@@ -84,6 +84,15 @@ nav {
   gap: 10px;
 }
 
+.runtime-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+  color: #4d5f54;
+  font-size: 13px;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: #597064;
@@ -146,6 +155,11 @@ h2 {
   color: #213027;
   background: #ffffff;
   cursor: pointer;
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .notice {
@@ -251,6 +265,66 @@ h2 {
   font-weight: 700;
 }
 
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(24, 34, 28, 0.08);
+  background: rgba(248, 250, 245, 0.72);
+}
+
+.controls-bar label,
+.search-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: #597064;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.controls-bar select,
+.search-box input {
+  height: 34px;
+  border: 1px solid rgba(24, 34, 28, 0.16);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #213027;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 500;
+}
+
+.search-box {
+  min-width: min(340px, 100%);
+  border: 1px solid rgba(24, 34, 28, 0.16);
+  border-radius: 6px;
+  padding: 0 6px 0 10px;
+  color: #597064;
+  background: #ffffff;
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 120px;
+  border: 0;
+  padding: 0;
+  outline: 0;
+}
+
+.search-box button {
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 10px;
+  color: #f7fbf4;
+  background: #1f4e38;
+  cursor: pointer;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -282,6 +356,26 @@ tbody tr:hover {
 
 .clickable-row {
   cursor: pointer;
+}
+
+.clickable-row[aria-selected="true"] {
+  background: rgba(31, 78, 56, 0.1);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  color: #4d5f54;
+  font-size: 13px;
+}
+
+.pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .mono {
@@ -324,6 +418,21 @@ tbody tr:hover {
 
   .topbar {
     flex-direction: column;
+  }
+
+  .controls-bar,
+  .pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .controls-bar label,
+  .search-box {
+    width: 100%;
+  }
+
+  .controls-bar select {
+    flex: 1;
   }
 
   .dashboard-grid {
