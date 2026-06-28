@@ -138,6 +138,11 @@ h2 {
   background: #9b2f2f;
 }
 
+.status-pill.partial {
+  color: #2a271c;
+  background: #f3d35a;
+}
+
 .status-pill.offline,
 .status-pill.stale {
   color: #5d3a19;

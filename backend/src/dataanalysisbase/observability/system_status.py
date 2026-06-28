@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -40,6 +40,8 @@ CONFIG_LOADERS = {
     "fusion_policy.yaml": load_fusion_policy,
     "reconcile_thresholds.yaml": load_reconcile_thresholds,
 }
+
+DEFAULT_STALE_AFTER_MINUTES = 45
 
 
 class CheckResult(BaseModel):
@@ -138,10 +140,15 @@ def build_runtime_status(
     latest_snapshot_time = snapshot_state.latest_snapshot_time
     providers = _provider_health(settings.config_dir)
     provider_connectivity = _provider_connectivity(settings.config_dir) if include_online else []
+    generated_at = datetime.now(UTC)
     return RuntimeStatus(
-        generated_at=datetime.now(UTC),
+        generated_at=generated_at,
         run_mode=settings.run_mode,
-        data_status=_data_status(latest_snapshot_time, snapshot_state.last_market_run),
+        data_status=compute_data_status(
+            latest_snapshot_time=latest_snapshot_time,
+            last_market_run=snapshot_state.last_market_run,
+            now=generated_at,
+        ),
         latest_snapshot_time=latest_snapshot_time,
         duckdb_path=str(settings.duckdb_path),
         config_dir=str(settings.config_dir),
@@ -322,15 +329,38 @@ def _market_run_status(row: dict[str, object] | None) -> MarketRunStatus | None:
     return MarketRunStatus.model_validate(row)
 
 
-def _data_status(
+def compute_data_status(
+    *,
     latest_snapshot_time: datetime | None,
     last_market_run: MarketRunStatus | None,
+    now: datetime,
+    stale_after_minutes: int = DEFAULT_STALE_AFTER_MINUTES,
 ) -> DataStatus:
+    """Compute the single runtime freshness status used by CLI/API/UI."""
+
+    if last_market_run is not None and last_market_run.status == "failed":
+        return DataStatus.FAILED
+
     if latest_snapshot_time is None and last_market_run is not None:
-        return DataStatus.FAILED if last_market_run.status == "failed" else DataStatus.OFFLINE
+        return DataStatus.PARTIAL if last_market_run.status == "partial" else DataStatus.OFFLINE
     if latest_snapshot_time is None:
         return DataStatus.OFFLINE
-    return DataStatus.FRESH
+
+    if last_market_run is not None and last_market_run.status == "partial":
+        return DataStatus.PARTIAL
+
+    age = _as_utc(now) - _as_utc(latest_snapshot_time)
+    return (
+        DataStatus.STALE
+        if age > timedelta(minutes=stale_after_minutes)
+        else DataStatus.FRESH
+    )
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _single_line(message: str) -> str:

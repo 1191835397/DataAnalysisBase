@@ -5,7 +5,9 @@ from dataanalysisbase.config_loader.settings import Settings
 from dataanalysisbase.domain.enums import DataStatus, RunStatus
 from dataanalysisbase.observability.provider_connectivity import ProviderConnectivity
 from dataanalysisbase.observability.system_status import (
+    MarketRunStatus,
     build_runtime_status,
+    compute_data_status,
     has_errors,
     run_doctor,
     validate_config,
@@ -13,6 +15,58 @@ from dataanalysisbase.observability.system_status import (
 from dataanalysisbase.storage import DuckDBStore, SnapshotRepo
 
 ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config"
+
+
+def test_compute_data_status_reports_fresh_before_stale_threshold() -> None:
+    now = datetime.fromisoformat("2026-06-26T10:30:00+08:00")
+    snapshot_time = datetime.fromisoformat("2026-06-26T10:00:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+    )
+
+    assert status == DataStatus.FRESH
+
+
+def test_compute_data_status_reports_stale_after_threshold() -> None:
+    now = datetime.fromisoformat("2026-06-26T10:46:00+08:00")
+    snapshot_time = datetime.fromisoformat("2026-06-26T10:00:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+    )
+
+    assert status == DataStatus.STALE
+
+
+def test_compute_data_status_failed_run_overrides_old_success() -> None:
+    now = datetime.fromisoformat("2026-06-26T10:20:00+08:00")
+    snapshot_time = datetime.fromisoformat("2026-06-26T10:00:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(now, RunStatus.FAILED),
+        now=now,
+    )
+
+    assert status == DataStatus.FAILED
+
+
+def test_compute_data_status_reports_partial_run() -> None:
+    now = datetime.fromisoformat("2026-06-26T10:20:00+08:00")
+    snapshot_time = datetime.fromisoformat("2026-06-26T10:00:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.PARTIAL),
+        now=now,
+    )
+
+    assert status == DataStatus.PARTIAL
 
 
 def test_validate_config_accepts_runtime_config() -> None:
@@ -193,3 +247,40 @@ def test_runtime_status_reports_failed_last_market_run(tmp_path: Path) -> None:
     assert status.last_market_run is not None
     assert status.last_market_run.status == "failed"
     assert status.last_market_run.error == "remote disconnected"
+
+
+def test_runtime_status_reports_partial_last_market_run(tmp_path: Path) -> None:
+    db_path = tmp_path / "data" / "analytics.duckdb"
+    store = DuckDBStore(db_path)
+    store.init_schema()
+    repo = SnapshotRepo(store)
+    snapshot_time = datetime(2026, 6, 26, 9, 30)
+    repo.begin_run(snapshot_time=snapshot_time, source="akshare", expected=2)
+    repo.commit_run(
+        snapshot_time=snapshot_time,
+        source="akshare",
+        status=RunStatus.PARTIAL,
+        actual=1,
+        missing=1,
+    )
+    store.close()
+    settings = Settings(config_dir=ROOT_CONFIG, data_dir=tmp_path / "data", duckdb_path=db_path)
+
+    status = build_runtime_status(settings)
+
+    assert status.data_status == DataStatus.PARTIAL
+    assert status.last_market_run is not None
+    assert status.last_market_run.status == "partial"
+
+
+def _run_status(snapshot_time: datetime, status: RunStatus) -> MarketRunStatus:
+    return MarketRunStatus(
+        snapshot_time=snapshot_time,
+        source="akshare",
+        status=status.value,
+        expected=1,
+        actual=1 if status != RunStatus.FAILED else 0,
+        missing=0,
+        started_at=snapshot_time,
+        finished_at=snapshot_time,
+    )
