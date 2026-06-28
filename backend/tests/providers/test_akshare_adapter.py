@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -72,6 +73,32 @@ def test_akshare_adapter_maps_market_spot_rows() -> None:
     assert second.security_id == "300750.SZ"
     assert second.price is None
     assert second.turnover_rate is None
+
+
+def test_akshare_adapter_normalizes_non_finite_numbers() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": math.nan,
+                    "涨跌幅": "nan",
+                    "成交额": "inf",
+                    "量比": "-inf",
+                }
+            ]
+        )
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    row = batch.rows[0]
+    assert row.price is None
+    assert row.change_pct is None
+    assert row.amount is None
+    assert row.volume_ratio is None
 
 
 def test_akshare_adapter_rejects_rows_missing_code_or_name() -> None:

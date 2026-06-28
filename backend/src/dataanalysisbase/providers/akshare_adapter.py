@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import math
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
@@ -298,9 +299,10 @@ def _float_value(record: Mapping[str, Any], *names: str) -> float | None:
         if not value or value in {"-", "--"}:
             return None
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    return number if math.isfinite(number) else None
 
 
 def _first_present(record: Mapping[str, Any], names: tuple[str, ...]) -> Any | None:
