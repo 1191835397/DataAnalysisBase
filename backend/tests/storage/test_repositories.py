@@ -112,6 +112,7 @@ def test_sync_job_repo_round_trips_latest_job(tmp_path: Path) -> None:
 
     loaded = repo.get("job-1")
     latest = repo.latest()
+    recent = repo.list_recent(10)
     assert loaded is not None
     assert loaded.job_id == "job-1"
     assert loaded.result is not None
@@ -119,6 +120,40 @@ def test_sync_job_repo_round_trips_latest_job(tmp_path: Path) -> None:
     assert loaded.elapsed_seconds == 12
     assert latest is not None
     assert latest.job_id == "job-1"
+    assert [item.job_id for item in recent] == ["job-1"]
+
+
+def test_sync_job_repo_lists_recent_jobs_by_created_at(tmp_path: Path) -> None:
+    store = DuckDBStore(tmp_path / "test.duckdb")
+    store.init_schema()
+    repo = SyncJobRepo(store)
+    first_at = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    second_at = datetime(2026, 6, 23, 10, 35, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    repo.upsert(
+        MarketSyncJobStatus(
+            job_id="job-1",
+            status=RunStatus.SUCCESS,
+            created_at=first_at,
+            finished_at=first_at,
+            result=_sync_result(first_at, actual=1),
+        )
+    )
+    repo.upsert(
+        MarketSyncJobStatus(
+            job_id="job-2",
+            status=RunStatus.PARTIAL,
+            created_at=second_at,
+            finished_at=second_at,
+            result=_sync_result(second_at, actual=2),
+        )
+    )
+
+    recent = repo.list_recent(1)
+
+    assert [job.job_id for job in recent] == ["job-2"]
+    assert recent[0].result is not None
+    assert recent[0].result.actual == 2
 
 
 def _row(
@@ -143,4 +178,15 @@ def _row(
         industry_code=industry_code,
         source="test",
         fetched_at=snapshot_time,
+    )
+
+
+def _sync_result(snapshot_time: datetime, *, actual: int) -> SyncResult:
+    return SyncResult(
+        task="market_bulk_sync",
+        status=RunStatus.SUCCESS,
+        expected=actual,
+        actual=actual,
+        missing=0,
+        snapshot_time=snapshot_time,
     )

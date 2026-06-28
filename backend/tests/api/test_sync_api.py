@@ -92,6 +92,39 @@ def test_latest_market_sync_returns_204_without_job(monkeypatch) -> None:
     assert response.status_code == 204
 
 
+def test_market_sync_jobs_returns_recent_jobs(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_main,
+        "_market_sync_jobs",
+        StaticJobStore(
+            MarketSyncJobStatus(
+                job_id="job-1",
+                status=RunStatus.SUCCESS,
+                created_at=datetime.fromisoformat("2026-06-28T15:30:00+08:00"),
+                finished_at=datetime.fromisoformat("2026-06-28T15:30:12+08:00"),
+                result=SyncResult(
+                    task="market_bulk_sync",
+                    status=RunStatus.SUCCESS,
+                    expected=3,
+                    actual=3,
+                    missing=0,
+                    snapshot_time=datetime.fromisoformat("2026-06-28T15:30:00+08:00"),
+                ),
+                elapsed_seconds=12,
+            )
+        ),
+    )
+    client = TestClient(api_main.app)
+
+    response = client.get("/api/v1/sync/market/jobs?limit=5")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["job_id"] == "job-1"
+    assert payload[0]["result"]["actual"] == 3
+
+
 def test_start_market_sync_rejects_concurrent_run(monkeypatch) -> None:
     active_job = MarketSyncJobStatus(
         job_id="active-job",
@@ -234,6 +267,66 @@ def test_market_sync_job_store_restores_latest_persisted_job(tmp_path) -> None:
     assert latest.result.actual == 1
 
 
+def test_market_sync_job_store_lists_recent_persisted_jobs(tmp_path) -> None:
+    db_path = tmp_path / "jobs.duckdb"
+    store = DuckDBStore(db_path)
+    store.init_schema()
+    repo = SyncJobRepo(store)
+    first_at = datetime.fromisoformat("2026-06-28T15:30:00+08:00")
+    second_at = datetime.fromisoformat("2026-06-28T15:35:00+08:00")
+    repo.upsert(
+        MarketSyncJobStatus(
+            job_id="job-1",
+            status=RunStatus.SUCCESS,
+            created_at=first_at,
+            finished_at=first_at,
+            result=SyncResult(
+                task="market_bulk_sync",
+                status=RunStatus.SUCCESS,
+                expected=1,
+                actual=1,
+                missing=0,
+                snapshot_time=first_at,
+            ),
+        )
+    )
+    repo.upsert(
+        MarketSyncJobStatus(
+            job_id="job-2",
+            status=RunStatus.PARTIAL,
+            created_at=second_at,
+            finished_at=second_at,
+            result=SyncResult(
+                task="market_bulk_sync",
+                status=RunStatus.PARTIAL,
+                expected=2,
+                actual=1,
+                missing=1,
+                snapshot_time=second_at,
+            ),
+        )
+    )
+    store.close()
+
+    job_store = MarketSyncJobStore(
+        lambda snapshot_time: SyncResult(
+            task="market_bulk_sync",
+            status=RunStatus.SUCCESS,
+            expected=0,
+            actual=0,
+            missing=0,
+            snapshot_time=snapshot_time,
+        ),
+        job_store_factory=lambda: _sync_job_repo(db_path),
+    )
+
+    recent = job_store.list_recent(2)
+
+    assert [job.job_id for job in recent] == ["job-2", "job-1"]
+    assert recent[0].result is not None
+    assert recent[0].result.missing == 1
+
+
 def _patch_job_store(monkeypatch, sync_fn) -> None:
     monkeypatch.setattr(api_main, "_market_sync_jobs", MarketSyncJobStore(sync_fn))
 
@@ -265,3 +358,6 @@ class StaticJobStore:
                 "message": "已请求取消, 等待当前 provider 请求结束",
             }
         )
+
+    def list_recent(self, _limit: int) -> list[MarketSyncJobStatus]:
+        return [] if self.job is None else [self.job]

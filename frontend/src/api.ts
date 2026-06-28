@@ -72,6 +72,11 @@ export function fetchLatestMarketSyncJob(): Promise<MarketSyncJob | null> {
   return fetchJsonOrEmpty<MarketSyncJob>("/api/v1/sync/market/latest");
 }
 
+export function fetchMarketSyncJobs(limit = 20): Promise<MarketSyncJob[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return fetchJson<MarketSyncJob[]>(`/api/v1/sync/market/jobs?${params.toString()}`);
+}
+
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {

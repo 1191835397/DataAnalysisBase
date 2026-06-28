@@ -95,6 +95,13 @@ def latest_market_sync_status() -> MarketSyncJobStatus | Response:
     return job
 
 
+@app.get("/api/v1/sync/market/jobs")
+def market_sync_jobs(limit: int = Query(default=20, ge=1, le=100)) -> list[MarketSyncJobStatus]:
+    """Return recent API-triggered market sync jobs."""
+
+    return _market_sync_jobs.list_recent(limit)
+
+
 @app.get("/api/v1/sync/market/{job_id}")
 def market_sync_status(job_id: str) -> MarketSyncJobStatus:
     """Return one API-triggered market sync job status."""

@@ -16,6 +16,7 @@ import {
 import {
   cancelMarketSync,
   fetchMarketSyncJob,
+  fetchMarketSyncJobs,
   fetchLatestMarketSyncJob,
   fetchIndustryStocks,
   fetchStocksPage,
@@ -101,6 +102,10 @@ function App() {
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
   const [syncTicker, setSyncTicker] = useState(0);
   const [isCancellingSync, setIsCancellingSync] = useState(false);
+  const [syncJobs, setSyncJobs] = useState<MarketSyncJob[]>([]);
+  const [isSyncHistoryLoading, setIsSyncHistoryLoading] = useState(false);
+  const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
+  const [syncHistoryKey, setSyncHistoryKey] = useState(0);
   const isSyncing = syncJob?.status === "running";
 
   useEffect(() => {
@@ -129,6 +134,33 @@ function App() {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    setIsSyncHistoryLoading(true);
+    setSyncHistoryError(null);
+
+    fetchMarketSyncJobs(20)
+      .then((jobs) => {
+        if (isActive) {
+          setSyncJobs(jobs);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (isActive) {
+          setSyncHistoryError(reason instanceof Error ? reason.message : "同步历史加载失败");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsSyncHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [syncHistoryKey]);
 
   useEffect(() => {
     let isActive = true;
@@ -235,6 +267,9 @@ function App() {
             return;
           }
           setSyncJob(nextJob);
+          setSyncJobs((jobs) =>
+            [nextJob, ...jobs.filter((item) => item.job_id !== nextJob.job_id)].slice(0, 20)
+          );
           if (nextJob.status === "running") {
             setSyncMessage(runningSyncMessage(nextJob));
             setSyncMessageTone(nextJob.cancel_requested || nextJob.elapsed_seconds >= 180 ? "error" : "info");
@@ -310,6 +345,10 @@ function App() {
     setRefreshKey((value) => value + 1);
   }
 
+  function refreshSyncHistory() {
+    setSyncHistoryKey((value) => value + 1);
+  }
+
   function handleStartMarketSync() {
     setSyncMessage(null);
     setSyncMessageTone("info");
@@ -317,7 +356,9 @@ function App() {
     startMarketSync()
       .then((job) => {
         setSyncJob(job);
+        setSyncJobs((jobs) => [job, ...jobs.filter((item) => item.job_id !== job.job_id)].slice(0, 20));
         setSyncMessage(runningSyncMessage(job));
+        refreshSyncHistory();
       })
       .catch((reason: unknown) => {
         if (reason instanceof SyncConflictError) {
@@ -335,6 +376,7 @@ function App() {
           });
           setSyncMessageTone("info");
           setSyncMessage("已有市场同步正在后台执行...");
+          refreshSyncHistory();
           return;
         }
         setSyncMessageTone("error");
@@ -350,8 +392,12 @@ function App() {
     cancelMarketSync(syncJob.job_id)
       .then((job) => {
         setSyncJob(job);
+        setSyncJobs((jobs) =>
+          jobs.map((item) => (item.job_id === job.job_id ? job : item))
+        );
         setSyncMessageTone("error");
         setSyncMessage(runningSyncMessage(job));
+        refreshSyncHistory();
       })
       .catch((reason: unknown) => {
         setSyncMessageTone("error");
@@ -363,6 +409,7 @@ function App() {
   }
 
   function handleCompletedSyncJob(job: MarketSyncJob, options: { refresh: boolean } = { refresh: true }) {
+    setSyncJobs((jobs) => [job, ...jobs.filter((item) => item.job_id !== job.job_id)].slice(0, 20));
     if (job.result) {
       setSyncMessageTone(job.result.status === "success" ? "success" : "error");
       setSyncMessage(`${syncResultCaption(job.result)}，耗时 ${formatDuration(job.elapsed_seconds)}`);
@@ -372,6 +419,7 @@ function App() {
     }
     if (options.refresh) {
       refreshDashboard();
+      refreshSyncHistory();
     }
   }
 
@@ -462,6 +510,11 @@ function App() {
         ) : null}
         {isSyncing ? <div className="notice">正在同步全市场快照...</div> : null}
         {isLoading ? <div className="notice">加载市场快照...</div> : null}
+        <SyncHistoryPanel
+          jobs={syncJobs}
+          isLoading={isSyncHistoryLoading}
+          error={syncHistoryError}
+        />
 
         {data && activeView === "overview" ? (
           <section className="dashboard-grid" aria-label="市场总览">
@@ -659,6 +712,103 @@ function DataHealthNotice({ status }: { status: DashboardData["status"] | null }
       </div>
     </div>
   );
+}
+
+function SyncHistoryPanel({
+  jobs,
+  isLoading,
+  error
+}: {
+  jobs: MarketSyncJob[];
+  isLoading: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="table-panel sync-history-panel" aria-label="同步历史">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">同步历史</p>
+          <h2>最近同步任务</h2>
+        </div>
+        <span>{isLoading ? "加载中" : `${formatInteger(jobs.length)} 条`}</span>
+      </div>
+      {error ? <div className="inline-notice error">{error}</div> : null}
+      {jobs.length === 0 && !isLoading ? <div className="inline-notice">暂无同步历史</div> : null}
+      {jobs.length > 0 ? (
+        <div className="table-wrap">
+          <table className="sync-history-table">
+            <thead>
+              <tr>
+                <th>任务</th>
+                <th>状态</th>
+                <th>开始</th>
+                <th>耗时</th>
+                <th>数量</th>
+                <th>取消</th>
+                <th>信息</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((job) => (
+                <tr key={job.job_id}>
+                  <td className="mono">{job.job_id.slice(0, 8)}</td>
+                  <td>
+                    <span className={`sync-status ${job.status}`}>{syncStatusLabel(job)}</span>
+                  </td>
+                  <td>{formatDateTime(job.started_at ?? job.created_at)}</td>
+                  <td>{formatDuration(syncElapsedSecondsForDisplay(job))}</td>
+                  <td>{syncJobResultSummary(job)}</td>
+                  <td>{job.cancel_requested ? "是" : "否"}</td>
+                  <td title={job.error ?? job.message}>{syncJobMessage(job)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function syncStatusLabel(job: MarketSyncJob): string {
+  if (job.cancel_requested && job.status !== "running") {
+    return "已取消";
+  }
+  const labels: Record<MarketSyncJob["status"], string> = {
+    running: "运行中",
+    success: "成功",
+    partial: "部分",
+    failed: "失败"
+  };
+  return labels[job.status];
+}
+
+function syncJobResultSummary(job: MarketSyncJob): string {
+  if (!job.result) {
+    return "-";
+  }
+  return `${formatInteger(job.result.actual)} / ${formatInteger(job.result.expected)}`;
+}
+
+function syncJobMessage(job: MarketSyncJob): string {
+  if (job.error) {
+    return job.error;
+  }
+  if (job.result) {
+    return `缺失 ${formatInteger(job.result.missing)}`;
+  }
+  return job.message;
+}
+
+function syncElapsedSecondsForDisplay(job: MarketSyncJob): number {
+  if (job.status !== "running") {
+    return job.elapsed_seconds;
+  }
+  const createdAt = new Date(job.created_at).getTime();
+  if (Number.isNaN(createdAt)) {
+    return job.elapsed_seconds;
+  }
+  return Math.max(Math.floor((Date.now() - createdAt) / 1000), job.elapsed_seconds);
 }
 
 function StatusPill({ status }: { status: DataStatus }) {

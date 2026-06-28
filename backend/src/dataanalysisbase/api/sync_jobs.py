@@ -71,6 +71,19 @@ class MarketSyncJobStore:
             job = self._jobs.get(self._latest_job_id)
             return _copy_job(job) if job is not None else None
 
+    def list_recent(self, limit: int) -> list[MarketSyncJobStatus]:
+        self._ensure_restored()
+        safe_limit = max(limit, 1)
+        with self._lock:
+            jobs = self._load_recent_persisted_jobs(safe_limit)
+            for index, job in enumerate(jobs):
+                cached_job = self._jobs.get(job.job_id)
+                if cached_job is not None:
+                    job = cached_job
+                    jobs[index] = cached_job
+                self._jobs[job.job_id] = job
+            return [_copy_job(job) for job in jobs]
+
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
         self._ensure_restored()
         with self._lock:
@@ -173,6 +186,15 @@ class MarketSyncJobStore:
         try:
             repo.mark_interrupted_running()
             return repo.latest()
+        finally:
+            store.close()
+
+    def _load_recent_persisted_jobs(self, limit: int) -> list[MarketSyncJobStatus]:
+        if self._job_store_factory is None:
+            return sorted(self._jobs.values(), key=lambda job: job.created_at, reverse=True)[:limit]
+        repo, store = self._open_job_repo()
+        try:
+            return repo.list_recent(limit)
         finally:
             store.close()
 

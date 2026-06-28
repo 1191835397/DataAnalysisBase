@@ -48,6 +48,19 @@ class SyncJobRepo(BaseRepo):
         )
         return _row_to_job(rows[0]) if rows else None
 
+    def list_recent(self, limit: int) -> list[MarketSyncJobStatus]:
+        rows = self.store.query(
+            """
+            SELECT job_id, status, created_at, started_at, finished_at, result, error,
+                   cancel_requested, message, elapsed_seconds
+            FROM api_sync_jobs
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            [max(limit, 1)],
+        )
+        return [_row_to_job(row) for row in rows]
+
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
         rows = self.store.query(
             """

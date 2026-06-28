@@ -341,6 +341,11 @@ h2 {
   overflow: hidden;
 }
 
+.sync-history-panel {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
 .empty-panel {
   padding: 24px;
 }
@@ -453,6 +458,79 @@ th {
   color: #597064;
   font-size: 12px;
   font-weight: 700;
+}
+
+.sync-history-table {
+  min-width: 920px;
+  table-layout: fixed;
+}
+
+.sync-history-table th:nth-child(1),
+.sync-history-table td:nth-child(1) {
+  width: 92px;
+}
+
+.sync-history-table th:nth-child(2),
+.sync-history-table td:nth-child(2) {
+  width: 88px;
+}
+
+.sync-history-table th:nth-child(3),
+.sync-history-table td:nth-child(3) {
+  width: 112px;
+}
+
+.sync-history-table th:nth-child(4),
+.sync-history-table td:nth-child(4) {
+  width: 72px;
+}
+
+.sync-history-table th:nth-child(5),
+.sync-history-table td:nth-child(5) {
+  width: 118px;
+}
+
+.sync-history-table th:nth-child(6),
+.sync-history-table td:nth-child(6) {
+  width: 64px;
+}
+
+.sync-history-table td:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  min-width: 58px;
+  height: 24px;
+  border-radius: 999px;
+  padding: 0 9px;
+  color: #4d5f54;
+  background: #eef2eb;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sync-status.running {
+  color: #1f4e38;
+  background: #e6f4ea;
+}
+
+.sync-status.success {
+  color: #f7fbf4;
+  background: #1f4e38;
+}
+
+.sync-status.partial {
+  color: #2a271c;
+  background: #f3d35a;
+}
+
+.sync-status.failed {
+  color: #fff8f7;
+  background: #9b2f2f;
 }
 
 tbody tr:hover {
