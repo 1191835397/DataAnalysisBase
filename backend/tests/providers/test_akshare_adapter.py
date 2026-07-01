@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -29,6 +29,7 @@ def test_akshare_adapter_maps_market_spot_rows() -> None:
                     "市净率": "8.1",
                     "总市值": "2120000000000",
                     "行业": "白酒",
+                    "上市时间": "20010827",
                 },
                 {
                     "代码": "300750",
@@ -67,12 +68,336 @@ def test_akshare_adapter_maps_market_spot_rows() -> None:
     assert first.pb == 8.1
     assert first.market_cap == 2120000000000.0
     assert first.industry_code == "白酒"
+    assert first.listing_date == date(2001, 8, 27)
     assert first.fetched_at == snapshot_time
 
     second = batch.rows[1]
     assert second.security_id == "300750.SZ"
     assert second.price is None
     assert second.turnover_rate is None
+    assert second.is_suspended is True
+
+
+def test_akshare_adapter_maps_explicit_suspended_status() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                    "交易状态": "正常",
+                },
+                {
+                    "代码": "000001",
+                    "名称": "平安银行",
+                    "最新价": "10.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                    "交易状态": "停牌",
+                },
+            ]
+        )
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].is_suspended is False
+    assert batch.rows[1].is_suspended is True
+
+
+def test_akshare_adapter_enriches_listing_date_from_stock_lists() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                },
+                {
+                    "代码": "300750",
+                    "名称": "宁德时代",
+                    "最新价": "200.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                },
+            ]
+        ),
+        listing_date_fetchers=(
+            lambda: FakeFrame(
+                [
+                    {"证券代码": "600519", "上市日期": "2001-08-27"},
+                    {"A股代码": "300750", "A股上市日期": "2018/06/11"},
+                ]
+            ),
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].listing_date == date(2001, 8, 27)
+    assert batch.rows[1].listing_date == date(2018, 6, 11)
+
+
+def test_akshare_adapter_prefers_spot_listing_date_over_stock_list() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                    "上市日期": "20010827",
+                }
+            ]
+        ),
+        listing_date_fetchers=(
+            lambda: FakeFrame([{"证券代码": "600519", "上市日期": "1999-01-01"}]),
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].listing_date == date(2001, 8, 27)
+
+
+def test_akshare_adapter_keeps_snapshot_when_listing_date_fetch_fails() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                }
+            ]
+        ),
+        listing_date_fetchers=(_raise_fetch_error,),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].listing_date is None
+
+
+def test_akshare_adapter_marks_ex_dividend_from_trade_calendar() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    seen_dates: list[date] = []
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                },
+                {
+                    "代码": "300750",
+                    "名称": "宁德时代",
+                    "最新价": "200.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                },
+            ]
+        ),
+        ex_dividend_fetcher=lambda day: seen_dates.append(day)
+        or FakeFrame(
+            [
+                {"股票代码": "600519", "除权日": "2026-06-23"},
+                {"股票代码": "300750", "除权日": "2026-06-22"},
+            ]
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert seen_dates == [date(2026, 6, 23)]
+    assert batch.rows[0].ex_dividend is True
+    assert batch.rows[1].ex_dividend is False
+
+
+def test_akshare_adapter_fetches_trade_calendar_dates() -> None:
+    adapter = AkshareAdapter(
+        trade_calendar_fetcher=lambda: FakeFrame(
+            [
+                {"trade_date": date(2026, 1, 2)},
+                {"trade_date": "2026-01-05"},
+                {"trade_date": "bad-date"},
+            ]
+        )
+    )
+
+    trade_dates = adapter.fetch_trade_dates()
+
+    assert trade_dates == {date(2026, 1, 2), date(2026, 1, 5)}
+
+
+def test_akshare_adapter_prefers_explicit_ex_dividend_field() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                    "ex_dividend": True,
+                },
+                {
+                    "代码": "300750",
+                    "名称": "宁德时代",
+                    "最新价": "200.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                    "ex_dividend": False,
+                },
+            ]
+        ),
+        ex_dividend_fetcher=lambda _day: FakeFrame(
+            [{"股票代码": "300750", "除权日": "2026-06-23"}]
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].ex_dividend is True
+    assert batch.rows[1].ex_dividend is False
+
+
+def test_akshare_adapter_marks_ex_dividend_from_history_reports() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                },
+                {
+                    "代码": "300750",
+                    "名称": "宁德时代",
+                    "最新价": "200.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                },
+            ]
+        ),
+        ex_dividend_history_fetchers=(
+            lambda: FakeFrame(
+                [
+                    {"代码": "600519", "除权除息日": "2026-06-23"},
+                    {"代码": "300750", "除权除息日": "2026-06-22"},
+                ]
+            ),
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].ex_dividend is True
+    assert batch.rows[1].ex_dividend is False
+
+
+def test_akshare_adapter_merges_notify_and_history_ex_dividend_sources() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                },
+                {
+                    "代码": "300750",
+                    "名称": "宁德时代",
+                    "最新价": "200.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                },
+            ]
+        ),
+        ex_dividend_fetcher=lambda _day: FakeFrame(
+            [{"股票代码": "600519", "除权日": "2026-06-23"}]
+        ),
+        ex_dividend_history_fetchers=(
+            lambda: FakeFrame([{"代码": "300750", "除权除息日": "2026-06-23"}]),
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].ex_dividend is True
+    assert batch.rows[1].ex_dividend is True
+
+
+def test_akshare_adapter_keeps_snapshot_when_ex_dividend_fetch_fails() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                }
+            ]
+        ),
+        ex_dividend_fetcher=lambda _day: _raise_fetch_error(),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].ex_dividend is False
+
+
+def test_akshare_adapter_keeps_snapshot_when_ex_dividend_history_fetch_fails() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                }
+            ]
+        ),
+        ex_dividend_history_fetchers=(_raise_fetch_error,),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].ex_dividend is False
 
 
 def test_akshare_adapter_normalizes_non_finite_numbers() -> None:
@@ -271,6 +596,37 @@ def test_akshare_adapter_falls_back_to_board_fetch_when_local_mapping_is_empty()
     batch = adapter.fetch_market_snapshot(snapshot_time)
 
     assert batch.rows[0].industry_code == "白酒"
+
+
+def test_akshare_adapter_fetches_bj_industry_mapping() -> None:
+    adapter = AkshareAdapter(
+        industry_name_fetcher=lambda: FakeFrame([]),
+        industry_cons_fetcher=lambda _symbol: FakeFrame([]),
+        bj_stock_info_fetcher=lambda: FakeFrame(
+            [
+                {"证券代码": "920000", "证券简称": "安徽凤凰", "所属行业": "汽车制造业"},
+                {"证券代码": "920001", "证券简称": "纬达光电", "所属行业": "计算机"},
+                {"证券代码": "bad-code", "证券简称": "坏数据", "所属行业": "未知"},
+                {"证券代码": "920002", "证券简称": "空行业", "所属行业": ""},
+            ]
+        )
+    )
+
+    mapping = adapter.fetch_industry_mapping()
+
+    assert mapping == {"920000.BJ": "汽车制造业", "920001.BJ": "计算机"}
+
+
+def test_akshare_adapter_keeps_board_industry_before_bj_list() -> None:
+    adapter = AkshareAdapter(
+        industry_name_fetcher=lambda: FakeFrame([{"板块名称": "板块行业"}]),
+        industry_cons_fetcher=lambda _symbol: FakeFrame([{"代码": "920000"}]),
+        bj_stock_info_fetcher=lambda: FakeFrame([{"证券代码": "920000", "所属行业": "北交所行业"}]),
+    )
+
+    mapping = adapter.fetch_industry_mapping()
+
+    assert mapping == {"920000.BJ": "板块行业"}
 
 
 def test_akshare_adapter_keeps_snapshot_when_industry_fetch_fails() -> None:

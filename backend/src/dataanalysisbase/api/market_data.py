@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from dataanalysisbase.api.market_alerts import (
+    MarketAlert,
+    _market_alert_from_record,
+    _refresh_persisted_alerts,
+)
 from dataanalysisbase.common.errors import StorageError
 from dataanalysisbase.config_loader import load_settings
-from dataanalysisbase.storage import AggregateRepo, DuckDBStore, IndustryQuery, StockQuery
+from dataanalysisbase.storage import (
+    AggregateRepo,
+    AlertRepo,
+    DuckDBStore,
+    IndustryQuery,
+    StockQuery,
+)
 from dataanalysisbase.storage.repositories.page import Page
 
 
@@ -47,6 +59,7 @@ class StockItem(BaseModel):
     pb: float | None = None
     market_cap: float | None = None
     industry_code: str | None = None
+    is_suspended: bool = False
     source: str
     fetched_at: str
 
@@ -64,6 +77,15 @@ class IndustryItem(BaseModel):
     up_count: int
     down_count: int
     source: str
+
+
+class StockDetail(BaseModel):
+    """Latest stock snapshot plus recent alert history."""
+
+    model_config = ConfigDict(frozen=True)
+
+    snapshot: StockItem
+    alerts: list[MarketAlert]
 
 
 def get_market_overview() -> MarketOverview:
@@ -119,6 +141,36 @@ def get_stocks_page(
     )
 
 
+def get_stock_detail(security_id: str, *, alert_limit: int = 20) -> StockDetail:
+    """Return the latest snapshot and alert history for one security."""
+
+    settings = load_settings()
+    repo, store = _aggregate_repo(settings.duckdb_path)
+    try:
+        row = repo.get_stock(security_id)
+    except StorageError as exc:
+        raise _service_unavailable(exc) from exc
+    finally:
+        store.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="stock not found in latest snapshot")
+
+    _refresh_persisted_alerts(settings.duckdb_path, settings.config_dir)
+    alert_repo, alert_store = _alert_repo(settings.duckdb_path, read_only=True)
+    try:
+        alerts = alert_repo.list_for_security(security_id, limit=alert_limit)
+    except StorageError as exc:
+        raise _service_unavailable(exc) from exc
+    finally:
+        alert_store.close()
+
+    return StockDetail(
+        snapshot=StockItem.model_validate(_jsonable_row(row)),
+        alerts=[_market_alert_from_record(alert) for alert in alerts],
+    )
+
+
 def get_industries(
     *,
     limit: int = 50,
@@ -139,10 +191,16 @@ def get_industries(
     return [IndustryItem.model_validate(_jsonable_row(row)) for row in rows]
 
 
-def _aggregate_repo() -> tuple[AggregateRepo, DuckDBStore]:
-    settings = load_settings()
-    store = DuckDBStore(settings.duckdb_path, read_only=True)
+def _aggregate_repo(duckdb_path: Path | None = None) -> tuple[AggregateRepo, DuckDBStore]:
+    if duckdb_path is None:
+        duckdb_path = load_settings().duckdb_path
+    store = DuckDBStore(duckdb_path, read_only=True)
     return AggregateRepo(store), store
+
+
+def _alert_repo(duckdb_path: Path, *, read_only: bool = False) -> tuple[AlertRepo, DuckDBStore]:
+    store = DuckDBStore(duckdb_path, read_only=read_only)
+    return AlertRepo(store), store
 
 
 def _jsonable_row(row: dict[str, Any]) -> dict[str, Any]:

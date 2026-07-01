@@ -1,6 +1,6 @@
 # 当前待办与运行手册
 
-> 最近更新：2026-06-29  
+> 最近更新：2026-07-01  
 > 目标：把当前开发上下文、启动部署流程、验证命令和 Git 同步流程集中到一处，便于交接和继续开发。
 
 ## 当前状态
@@ -11,22 +11,17 @@
 - 前端端口：`127.0.0.1:5173`
 - 前端代理：`/api` -> `http://localhost:8000`
 - 默认 DuckDB：`data/duckdb/analytics.duckdb`
-- 当前可用页面：市场总览、行业、股票、告警
-- 当前可用同步能力：API 触发后台市场同步、取消、持久化任务、历史列表、任务详情、重试入口
-- 当前可用告警能力：系统告警、涨停、跌停、放量、异常涨跌幅、同股票告警分组、等级/类型筛选、点击定位股票
+- 当前可用页面：市场总览、行业排行、行业覆盖概览、行业热力图、行业成分股、股票、个股详情面板、告警
+- 当前可用同步能力：API 触发后台市场同步、取消、持久化任务、历史分页、最近失败统计、任务详情、结构化运行日志、运行 artifact、重试入口、本地行业映射文件回填最新快照
+- 当前可用告警能力：系统告警、涨停、跌停、放量、异常涨跌幅、告警持久化、read / handled / ignored 生命周期、按 `dedupe.window_minutes` / `cooldown_minutes` 冷却去重、同股票告警分组、等级/类型/状态筛选、点击定位个股详情
 
 ## 当前待办
 
 优先级从高到低：
 
-1. 告警生命周期：新增 read / handled / ignored 状态，支持前端标记处理。
-2. 告警持久化：将当前派生告警落表，保留历史、处理状态、首次/最近触发时间。
-3. 告警冷却窗口：按 `surveillance_rules.yaml` 的 `dedupe.window_minutes` 和规则 `cooldown_minutes` 去重。
-4. 行业热力图：基于 `industry_snapshots` 做行业涨跌、成交额、告警密度视图。
-5. 个股详情页：从告警或股票列表进入，展示当日快照、历史告警、行业归属和基础指标。
-6. 同步任务历史增强：后端分页、最近 N 次失败统计、运行日志或 artifact 链接。
-7. 数据正确性：处理停牌、新股首快照、除权除息、交易日历对 freshness 的影响。
-8. 生产化部署：增加 Docker / launchd / systemd 或等价进程守护方案。
+1. 完整行业映射数据源：行业映射同步已按优先级自动合并 Tushare（有 token 时）/ AKShare / efinance / BaoStock，AKShare 会补充北交所股票列表行业，BaoStock 可补主板/深市映射；近期真实同步覆盖率已约 99.96%，仍需处理极少数 `UNKNOWN` / 退市标的补齐策略。
+2. 数据正确性：交易日历 freshness 已按 `sync_schedule.yaml` 交易时段口径处理，并支持 `holidays` / `makeup_trading_days` 手动维护真实节假日与调休交易日，2026 年交易日历已通过 AKShare 新浪交易日历同步到 2026-07-01；delta 类价格告警已在首快照 / 无上一价格时跳过，股票级告警已按 `is_suspended` 显式停牌字段和无有效价格或零成交量/零成交额标的做停牌式保守过滤，ST / 科创板 / 创业板 / 北交所涨跌停阈值已按代码和名称分档，AKShare 市场同步会从沪/深/北交易所批量股票列表补齐 `listing_date`，快照存在 `listing_date` 时上市初期 5 个自然日内跳过涨跌停判定，AKShare 市场同步会按快照日期读取分红派息提醒并合并报告期历史分红送配记录，命中当日除权除息日时标记 `ex_dividend=true`，快照存在 `ex_dividend=true` 时跳过 delta 类价格告警；下一步优先接入独立停牌公告/清单数据源，交易日历和历史除权除息仍需按真实样本持续核验。
+3. 生产化部署：增加 Docker / launchd / systemd 或等价进程守护方案。
 
 ## 首次环境准备
 
@@ -65,6 +60,8 @@ DAB_DEEPSEEK_API_KEY=
 - AKShare 不需要 token，是当前全市场快照主 provider。
 - Tushare / DeepSeek token 为空时对应能力降级，不应阻塞基础市场页。
 - `data/` 被 `.gitignore` 忽略，不提交本地 DuckDB 数据。
+- `config/sync_schedule.yaml` 的 `holidays` / `makeup_trading_days` 用 `YYYY-MM-DD` 维护，用于运行状态 freshness 判断真实休市日和调休交易日。
+- `sync trade-calendar` 默认 dry-run；传 `--execute` 后会调用 AKShare 新浪交易日历并写回 `config/sync_schedule.yaml`。
 
 ## 本地启动流程
 
@@ -116,6 +113,56 @@ cd backend
 ```bash
 cd backend
 .venv/bin/python -m dataanalysisbase.delivery.cli sync market --execute --json
+```
+
+行业映射：
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli sync industry-mapping --execute --json
+```
+
+交易日历：
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli sync trade-calendar --json
+.venv/bin/python -m dataanalysisbase.delivery.cli sync trade-calendar --year 2026 --execute --json
+```
+
+备用 provider 可显式指定：
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli sync industry-mapping --provider tushare --execute --json
+.venv/bin/python -m dataanalysisbase.delivery.cli sync industry-mapping --provider baostock --execute --json
+```
+
+说明：
+
+- 默认不指定 `--provider` 时，会按配置优先级自动合并可用候选：Tushare（已配置 token 时）/ AKShare / efinance / BaoStock；前序来源优先，后序来源只补缺。指定 `--provider` 时只使用该单一来源刷新映射文件。
+- 当前 AKShare 行业映射真实同步可能返回 0 条，失败时不会写空文件，并会继续尝试下一候选。
+- AKShare 还会读取北交所股票列表里的 `所属行业` 字段，用于补充 `920xxx.BJ` 代码体系。
+- Tushare 需要 token 且账号需有 `stock_basic` 权限；BaoStock 真实可用性取决于本机网络能否连接 BaoStock 服务；efinance 实时行情可能不含行业字段。
+- 如果已有 `data/industry_mapping.csv`，可回填最新快照并刷新行业聚合：
+- 行业页会展示行业映射覆盖率、UNKNOWN 占比、行业热力图和行业排行；UNKNOWN 占比高时热力图不能代表全市场行业分布。
+- 可用只读体检命令查看当前覆盖率：
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli industry coverage --json
+```
+
+- 如需人工补齐静态映射，可导出当前缺口模板：
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli industry coverage --missing-output ../data/industry_mapping_missing.csv --json
+```
+
+```bash
+cd backend
+.venv/bin/python -m dataanalysisbase.delivery.cli sync industry-backfill --execute --json
 ```
 
 也可以从页面点击顶部“同步”按钮触发后台任务。页面触发的任务会持久化到 `api_sync_jobs`，服务重启后可恢复最新任务状态；重启前仍在 `running` 的任务会标记为失败并提示被 API 重启中断。
@@ -223,12 +270,15 @@ GET  /api/v1/system/status
 POST /api/v1/sync/market
 GET  /api/v1/sync/market/latest
 GET  /api/v1/sync/market/jobs
+GET  /api/v1/sync/market/history
 GET  /api/v1/sync/market/{job_id}
 POST /api/v1/sync/market/{job_id}/cancel
 GET  /api/v1/alerts/market
 GET  /api/v1/alerts/market/groups
+PATCH /api/v1/alerts/market/{alert_id}
 GET  /api/v1/market/overview
 GET  /api/v1/stocks
+GET  /api/v1/stocks/{security_id}
 GET  /api/v1/industries
 GET  /api/v1/industries/{industry_code}/stocks
 ```

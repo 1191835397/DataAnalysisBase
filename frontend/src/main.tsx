@@ -16,14 +16,16 @@ import {
 import {
   cancelMarketSync,
   fetchMarketAlertGroups,
+  fetchMarketSyncHistory,
   fetchMarketSyncJob,
-  fetchMarketSyncJobs,
   fetchLatestMarketSyncJob,
   fetchIndustryStocks,
+  fetchStockDetail,
   fetchStocksPage,
   loadDashboardData,
   startMarketSync,
   SyncConflictError,
+  updateMarketAlertStatus,
   type DashboardData
 } from "./api";
 import {
@@ -41,11 +43,15 @@ import {
 } from "./format";
 import type {
   DataStatus,
+  AlertStatus,
+  IndustryItem,
   MarketAlert,
   MarketAlertGroup,
+  MarketSyncFailureSummary,
   MarketSyncJob,
   Page,
   SortOrder,
+  StockDetail,
   StockFilter,
   StockItem,
   StockQuery,
@@ -79,6 +85,7 @@ const stockSortOptions = [
 type ActiveView = (typeof navigation)[number]["key"];
 type AlertSeverityFilter = MarketAlert["severity"] | "all";
 type AlertKindFilter = MarketAlert["kind"] | "system" | "all";
+type AlertStatusFilter = AlertStatus | "all";
 
 const alertSeverityOptions: Array<{ value: AlertSeverityFilter; label: string }> = [
   { value: "all", label: "全部" },
@@ -94,6 +101,14 @@ const alertKindOptions: Array<{ value: AlertKindFilter; label: string }> = [
   { value: "limit_down", label: "跌停" },
   { value: "volume_surge", label: "放量" },
   { value: "extreme_move", label: "异常涨跌幅" }
+];
+
+const alertStatusOptions: Array<{ value: AlertStatusFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "new", label: "新告警" },
+  { value: "read", label: "已读" },
+  { value: "handled", label: "已处理" },
+  { value: "ignored", label: "忽略" }
 ];
 
 function App() {
@@ -118,12 +133,19 @@ function App() {
   const [stockPage, setStockPage] = useState<Page<StockItem> | null>(null);
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
+  const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
+  const [isStockDetailLoading, setIsStockDetailLoading] = useState(false);
+  const [stockDetailError, setStockDetailError] = useState<string | null>(null);
   const [syncJob, setSyncJob] = useState<MarketSyncJob | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageTone, setSyncMessageTone] = useState<"success" | "error" | "info">("info");
   const [syncTicker, setSyncTicker] = useState(0);
   const [isCancellingSync, setIsCancellingSync] = useState(false);
   const [syncJobs, setSyncJobs] = useState<MarketSyncJob[]>([]);
+  const [syncHistoryPage, setSyncHistoryPage] = useState(1);
+  const [syncHistoryTotal, setSyncHistoryTotal] = useState(0);
+  const [syncFailureSummary, setSyncFailureSummary] = useState<MarketSyncFailureSummary | null>(null);
   const [isSyncHistoryLoading, setIsSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryKey, setSyncHistoryKey] = useState(0);
@@ -165,10 +187,12 @@ function App() {
     setIsSyncHistoryLoading(true);
     setSyncHistoryError(null);
 
-    fetchMarketSyncJobs(20)
-      .then((jobs) => {
+    fetchMarketSyncHistory(syncHistoryPage, 10, 20)
+      .then((history) => {
         if (isActive) {
-          setSyncJobs(jobs);
+          setSyncJobs(history.jobs.items);
+          setSyncHistoryTotal(history.jobs.total);
+          setSyncFailureSummary(history.failure_summary);
         }
       })
       .catch((reason: unknown) => {
@@ -185,7 +209,7 @@ function App() {
     return () => {
       isActive = false;
     };
-  }, [syncHistoryKey]);
+  }, [syncHistoryKey, syncHistoryPage]);
 
   useEffect(() => {
     let isActive = true;
@@ -307,6 +331,40 @@ function App() {
   }, [stockQuery, refreshKey]);
 
   useEffect(() => {
+    if (!selectedStockId) {
+      setStockDetail(null);
+      setStockDetailError(null);
+      return;
+    }
+
+    let isActive = true;
+    setIsStockDetailLoading(true);
+    setStockDetailError(null);
+
+    fetchStockDetail(selectedStockId, 20)
+      .then((detail) => {
+        if (isActive) {
+          setStockDetail(detail);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (isActive) {
+          setStockDetail(null);
+          setStockDetailError(reason instanceof Error ? reason.message : "股票详情加载失败");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsStockDetailLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedStockId, refreshKey, alertsKey]);
+
+  useEffect(() => {
     if (!syncJob || syncJob.status !== "running") {
       return;
     }
@@ -374,10 +432,25 @@ function App() {
     }
     return data.overview.up_count / data.overview.stock_count;
   }, [data]);
+  const industryCoverage = useMemo(() => {
+    if (!data?.industries.length) {
+      return null;
+    }
+    return buildIndustryCoverage(data.industries);
+  }, [data]);
 
   function selectIndustry(industryCode: string) {
     setSelectedIndustry(industryCode);
     setIndustryPage(1);
+  }
+
+  function focusIndustry(industryCode: string) {
+    setActiveView("industries");
+    selectIndustry(industryCode);
+  }
+
+  function selectStock(securityId: string) {
+    setSelectedStockId(securityId);
   }
 
   function updateStockQuery(patch: Partial<StockQuery>, resetPage = true) {
@@ -399,6 +472,7 @@ function App() {
   }
 
   function refreshSyncHistory() {
+    setSyncHistoryPage(1);
     setSyncHistoryKey((value) => value + 1);
   }
 
@@ -432,7 +506,8 @@ function App() {
             error: null,
             cancel_requested: false,
             elapsed_seconds: 0,
-            message: "正在抓取 AKShare 全市场快照"
+            message: "正在抓取 AKShare 全市场快照",
+            artifact_path: null
           });
           setSyncMessageTone("info");
           setSyncMessage("已有市场同步正在后台执行...");
@@ -456,8 +531,24 @@ function App() {
       return;
     }
     setActiveView("stocks");
+    selectStock(group.security_id);
     setStockSearch(group.security_id);
     updateStockQuery({ q: group.security_id, filter: undefined });
+  }
+
+  function handleUpdateAlertStatus(alertIds: string[], status: AlertStatus) {
+    const uniqueAlertIds = Array.from(new Set(alertIds));
+    if (uniqueAlertIds.length === 0) {
+      return;
+    }
+    setAlertsError(null);
+    Promise.all(uniqueAlertIds.map((alertId) => updateMarketAlertStatus(alertId, status)))
+      .then(() => {
+        setAlertsKey((value) => value + 1);
+      })
+      .catch((reason: unknown) => {
+        setAlertsError(reason instanceof Error ? reason.message : "告警状态更新失败");
+      });
   }
 
   function handleCancelMarketSync() {
@@ -588,9 +679,14 @@ function App() {
         {isLoading ? <div className="notice">加载市场快照...</div> : null}
         <SyncHistoryPanel
           jobs={syncJobs}
+          page={syncHistoryPage}
+          size={10}
+          total={syncHistoryTotal}
+          failureSummary={syncFailureSummary}
           isLoading={isSyncHistoryLoading}
           error={syncHistoryError}
           isRetryDisabled={isSyncing}
+          onPageChange={setSyncHistoryPage}
           onRetry={handleRetryMarketSync}
         />
 
@@ -625,6 +721,47 @@ function App() {
 
         {data && activeView === "industries" ? (
           <>
+            {industryCoverage ? (
+              <>
+                <section className="dashboard-grid industry-summary" aria-label="行业覆盖概览">
+                  <MetricPanel
+                    label="已识别行业"
+                    value={formatInteger(industryCoverage.knownIndustryCount)}
+                    caption={`${formatInteger(industryCoverage.knownStockCount)} 只有行业归属`}
+                  />
+                  <MetricPanel
+                    label="UNKNOWN 占比"
+                    value={formatPercent(industryCoverage.unknownRatio)}
+                    caption={`${formatInteger(industryCoverage.unknownStockCount)} / ${formatInteger(
+                      industryCoverage.totalStockCount
+                    )} 未归类`}
+                  />
+                  <MetricPanel
+                    label="行业上涨占比"
+                    value={formatPercent(industryCoverage.upRatio)}
+                    caption={`${formatInteger(industryCoverage.upCount)} 上涨 / ${formatInteger(
+                      industryCoverage.downCount
+                    )} 下跌`}
+                  />
+                  <MetricPanel
+                    label="已归类成交额"
+                    value={formatAmount(industryCoverage.knownAmount)}
+                    caption={`全市场 ${formatAmount(industryCoverage.totalAmount)}`}
+                  />
+                </section>
+                {industryCoverage.unknownRatio > 0.2 ? (
+                  <div className="notice industry-warning">
+                    行业映射覆盖不足，UNKNOWN 占比 {formatPercent(industryCoverage.unknownRatio)}。
+                    当前热力图仍可用于检查已归类样本，但不能代表全市场行业分布。
+                  </div>
+                ) : null}
+                <IndustryHeatmap
+                  industries={data.industries}
+                  selectedIndustry={selectedIndustry}
+                  onSelectIndustry={selectIndustry}
+                />
+              </>
+            ) : null}
             <section className="table-panel" aria-label="行业排行">
               <div className="section-heading">
                 <div>
@@ -683,12 +820,24 @@ function App() {
                 {isIndustryLoading ? <div className="inline-notice">加载行业成分股...</div> : null}
                 {industryStocks ? (
                   <>
-                    <StockTable stocks={industryStocks.items} />
+                    <StockTable
+                      stocks={industryStocks.items}
+                      selectedStockId={selectedStockId}
+                      onSelectStock={selectStock}
+                    />
                     <Pagination
                       page={industryStocks.page}
                       size={industryStocks.size}
                       total={industryStocks.total}
                       onPageChange={setIndustryPage}
+                    />
+                    <StockDetailPanel
+                      detail={stockDetail}
+                      selectedStockId={selectedStockId}
+                      isLoading={isStockDetailLoading}
+                      error={stockDetailError}
+                      onSelectIndustry={focusIndustry}
+                      onUpdateAlertStatus={handleUpdateAlertStatus}
                     />
                   </>
                 ) : null}
@@ -723,12 +872,24 @@ function App() {
             {isStockLoading ? <div className="inline-notice">加载股票列表...</div> : null}
             {stockPage ? (
               <>
-                <StockTable stocks={stockPage.items} />
+                <StockTable
+                  stocks={stockPage.items}
+                  selectedStockId={selectedStockId}
+                  onSelectStock={selectStock}
+                />
                 <Pagination
                   page={stockPage.page}
                   size={stockPage.size}
                   total={stockPage.total}
                   onPageChange={(page) => updateStockQuery({ page }, false)}
+                />
+                <StockDetailPanel
+                  detail={stockDetail}
+                  selectedStockId={selectedStockId}
+                  isLoading={isStockDetailLoading}
+                  error={stockDetailError}
+                  onSelectIndustry={focusIndustry}
+                  onUpdateAlertStatus={handleUpdateAlertStatus}
                 />
               </>
             ) : null}
@@ -741,6 +902,7 @@ function App() {
             isLoading={isAlertsLoading}
             error={alertsError}
             onSelectAlert={handleSelectAlert}
+            onUpdateAlertStatus={handleUpdateAlertStatus}
           />
         ) : null}
       </section>
@@ -763,6 +925,67 @@ function MetricPanel({
       <strong>{value}</strong>
       <p>{caption}</p>
     </article>
+  );
+}
+
+type IndustryCoverage = {
+  totalStockCount: number;
+  knownStockCount: number;
+  unknownStockCount: number;
+  knownIndustryCount: number;
+  totalAmount: number | null;
+  knownAmount: number | null;
+  upCount: number;
+  downCount: number;
+  unknownRatio: number;
+  upRatio: number;
+};
+
+function IndustryHeatmap({
+  industries,
+  selectedIndustry,
+  onSelectIndustry
+}: {
+  industries: IndustryItem[];
+  selectedIndustry: string | null;
+  onSelectIndustry: (industryCode: string) => void;
+}) {
+  const sortedIndustries = [...industries].sort(
+    (left, right) => Math.abs(right.change_pct_avg ?? 0) - Math.abs(left.change_pct_avg ?? 0)
+  );
+  const maxAmount = Math.max(...industries.map((industry) => industry.amount_sum ?? 0), 0);
+
+  return (
+    <section className="table-panel industry-heatmap-panel" aria-label="行业热力图">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">行业热力</p>
+          <h2>涨跌幅与成交额分布</h2>
+        </div>
+        <span>{formatInteger(sortedIndustries.length)} 个行业</span>
+      </div>
+      <div className="industry-heatmap">
+        {sortedIndustries.map((industry) => (
+          <button
+            className={`industry-tile ${heatClass(industry.change_pct_avg)}`}
+            key={industry.industry_code}
+            type="button"
+            aria-pressed={selectedIndustry === industry.industry_code}
+            onClick={() => onSelectIndustry(industry.industry_code)}
+          >
+            <span>{displayIndustry(industry.industry_code)}</span>
+            <strong>{formatSignedPercent(industry.change_pct_avg)}</strong>
+            <em>{formatInteger(industry.stock_count)} 只</em>
+            <div className="heat-volume-track" aria-hidden="true">
+              <div
+                className="heat-volume-bar"
+                style={{ width: `${heatAmountWidth(industry.amount_sum, maxAmount)}%` }}
+              />
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -795,15 +1018,25 @@ function DataHealthNotice({ status }: { status: DashboardData["status"] | null }
 
 function SyncHistoryPanel({
   jobs,
+  page,
+  size,
+  total,
+  failureSummary,
   isLoading,
   error,
   isRetryDisabled,
+  onPageChange,
   onRetry
 }: {
   jobs: MarketSyncJob[];
+  page: number;
+  size: number;
+  total: number;
+  failureSummary: MarketSyncFailureSummary | null;
   isLoading: boolean;
   error: string | null;
   isRetryDisabled: boolean;
+  onPageChange: (page: number) => void;
   onRetry: (job: MarketSyncJob) => void;
 }) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -816,8 +1049,9 @@ function SyncHistoryPanel({
           <p className="eyebrow">同步历史</p>
           <h2>最近同步任务</h2>
         </div>
-        <span>{isLoading ? "加载中" : `${formatInteger(jobs.length)} 条`}</span>
+        <span>{isLoading ? "加载中" : `${formatInteger(total)} 条`}</span>
       </div>
+      {failureSummary ? <SyncFailureSummary summary={failureSummary} /> : null}
       {error ? <div className="inline-notice error">{error}</div> : null}
       {jobs.length === 0 && !isLoading ? <div className="inline-notice">暂无同步历史</div> : null}
       {jobs.length > 0 ? (
@@ -857,6 +1091,9 @@ function SyncHistoryPanel({
           </table>
         </div>
       ) : null}
+      {total > 0 ? (
+        <Pagination page={page} size={size} total={total} onPageChange={onPageChange} />
+      ) : null}
       {selectedJob ? (
         <SyncJobDetail
           job={selectedJob}
@@ -865,6 +1102,17 @@ function SyncHistoryPanel({
         />
       ) : null}
     </section>
+  );
+}
+
+function SyncFailureSummary({ summary }: { summary: MarketSyncFailureSummary }) {
+  return (
+    <div className="sync-failure-summary">
+      <DetailItem label={`最近 ${formatInteger(summary.recent)} 次`} value={formatInteger(summary.total)} />
+      <DetailItem label="失败" value={formatInteger(summary.failed)} />
+      <DetailItem label="部分同步" value={formatInteger(summary.partial)} />
+      <DetailItem label="最近失败" value={formatDateTime(summary.latest_failed_at)} />
+    </div>
   );
 }
 
@@ -905,10 +1153,39 @@ function SyncJobDetail({
         <DetailItem label="缺失" value={job.result ? formatInteger(job.result.missing) : "-"} />
         <DetailItem label="快照" value={formatDateTime(job.result?.snapshot_time ?? null)} />
         <DetailItem label="任务状态" value={job.result ? runStatusLabel(job.result.status) : "-"} />
+        <DetailItem label="Artifact" value={job.artifact_path ? artifactFileName(job.artifact_path) : "-"} />
       </div>
+      {job.artifact_path ? (
+        <div className="sync-job-detail-message">
+          <strong>Artifact 路径</strong>
+          <span>{job.artifact_path}</span>
+        </div>
+      ) : null}
       <div className="sync-job-detail-message">
         <strong>{job.error ? "错误" : "信息"}</strong>
         <span>{syncJobDetailMessage(job)}</span>
+      </div>
+      {job.result?.logs.length ? <SyncJobLogList logs={job.result.logs} /> : null}
+    </div>
+  );
+}
+
+function SyncJobLogList({ logs }: { logs: NonNullable<MarketSyncJob["result"]>["logs"] }) {
+  return (
+    <div className="sync-job-log-list">
+      <strong>运行日志</strong>
+      <div>
+        {logs.map((entry, index) => (
+          <div className="sync-job-log-entry" key={`${entry.stage}-${entry.at}-${index}`}>
+            <span className={`sync-log-level ${entry.level}`}>{syncLogLevelLabel(entry.level)}</span>
+            <span>{formatDateTime(entry.at)}</span>
+            <span>{syncStageLabel(entry.stage)}</span>
+            <p>{entry.message}</p>
+            {Object.keys(entry.details).length ? (
+              <code>{formatSyncLogDetails(entry.details)}</code>
+            ) : null}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -967,6 +1244,48 @@ function syncJobDetailMessage(job: MarketSyncJob): string {
   return job.message;
 }
 
+function syncLogLevelLabel(level: string): string {
+  const labels: Record<string, string> = {
+    info: "信息",
+    warning: "警告",
+    error: "错误"
+  };
+  return labels[level] ?? level;
+}
+
+function syncStageLabel(stage: string): string {
+  const labels: Record<string, string> = {
+    provider_fetch: "抓取",
+    snapshot_run: "运行记录",
+    snapshot_write: "快照写入",
+    aggregate_refresh: "聚合刷新",
+    sync_result: "结果",
+    sync_exception: "异常",
+    sync_cancel: "取消"
+  };
+  return labels[stage] ?? stage;
+}
+
+function formatSyncLogDetails(details: Record<string, unknown>): string {
+  return Object.entries(details)
+    .map(([key, value]) => `${key}=${formatSyncLogValue(value)}`)
+    .join("，");
+}
+
+function formatSyncLogValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(formatSyncLogValue).join("|");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function artifactFileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
+
 function syncElapsedSecondsForDisplay(job: MarketSyncJob): number {
   if (job.status !== "running") {
     return job.elapsed_seconds;
@@ -985,6 +1304,71 @@ function alertSeverityLabel(severity: MarketAlert["severity"]): string {
     info: "信息"
   };
   return labels[severity];
+}
+
+function buildIndustryCoverage(industries: IndustryItem[]): IndustryCoverage {
+  const totalStockCount = industries.reduce((sum, industry) => sum + industry.stock_count, 0);
+  const unknown = industries.find((industry) => industry.industry_code === "UNKNOWN") ?? null;
+  const unknownStockCount = unknown?.stock_count ?? 0;
+  const knownStockCount = Math.max(totalStockCount - unknownStockCount, 0);
+  const knownIndustries = industries.filter((industry) => industry.industry_code !== "UNKNOWN");
+  const totalAmount = sumNullable(industries.map((industry) => industry.amount_sum));
+  const knownAmount = sumNullable(knownIndustries.map((industry) => industry.amount_sum));
+  const upCount = industries.reduce((sum, industry) => sum + industry.up_count, 0);
+  const downCount = industries.reduce((sum, industry) => sum + industry.down_count, 0);
+  return {
+    totalStockCount,
+    knownStockCount,
+    unknownStockCount,
+    knownIndustryCount: knownIndustries.length,
+    totalAmount,
+    knownAmount,
+    upCount,
+    downCount,
+    unknownRatio: totalStockCount === 0 ? 0 : unknownStockCount / totalStockCount,
+    upRatio: totalStockCount === 0 ? 0 : upCount / totalStockCount
+  };
+}
+
+function sumNullable(values: Array<number | null>): number | null {
+  const numbers = values.filter((value): value is number => value !== null);
+  if (numbers.length === 0) {
+    return null;
+  }
+  return numbers.reduce((sum, value) => sum + value, 0);
+}
+
+function heatClass(value: number | null): string {
+  if (value === null || value === 0) {
+    return "neutral";
+  }
+  if (value >= 2) {
+    return "hot-up";
+  }
+  if (value > 0) {
+    return "up";
+  }
+  if (value <= -2) {
+    return "hot-down";
+  }
+  return "down";
+}
+
+function heatAmountWidth(value: number | null, maxAmount: number): number {
+  if (value === null || maxAmount <= 0) {
+    return 0;
+  }
+  return Math.max(8, Math.min((value / maxAmount) * 100, 100));
+}
+
+function alertStatusLabel(status: AlertStatus): string {
+  const labels: Record<AlertStatus, string> = {
+    new: "新",
+    read: "已读",
+    handled: "已处理",
+    ignored: "忽略"
+  };
+  return labels[status];
 }
 
 function alertKindLabel(kind: MarketAlert["kind"]): string {
@@ -1042,6 +1426,13 @@ function formatAlertThreshold(alert: MarketAlert): string {
   return formatNumber(alert.threshold);
 }
 
+function formatPercentFromNullable(value: number | null): string {
+  if (value === null) {
+    return "-";
+  }
+  return `${formatNumber(value)}%`;
+}
+
 function StatusPill({ status }: { status: DataStatus }) {
   return <div className={`status-pill ${status}`}>{dataStatusLabel(status)}</div>;
 }
@@ -1050,20 +1441,24 @@ function AlertPanel({
   groups,
   isLoading,
   error,
-  onSelectAlert
+  onSelectAlert,
+  onUpdateAlertStatus
 }: {
   groups: MarketAlertGroup[];
   isLoading: boolean;
   error: string | null;
   onSelectAlert: (group: MarketAlertGroup) => void;
+  onUpdateAlertStatus: (alertIds: string[], status: AlertStatus) => void;
 }) {
   const [severityFilter, setSeverityFilter] = useState<AlertSeverityFilter>("all");
   const [kindFilter, setKindFilter] = useState<AlertKindFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<AlertStatusFilter>("all");
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const visibleGroups = groups.filter(
     (group) =>
       (severityFilter === "all" || group.severity === severityFilter) &&
-      (kindFilter === "all" || groupMatchesKind(group, kindFilter))
+      (kindFilter === "all" || groupMatchesKind(group, kindFilter)) &&
+      (statusFilter === "all" || group.status === statusFilter)
   );
   const highCount = groups.filter((group) => group.severity === "high").length;
   return (
@@ -1105,6 +1500,19 @@ function AlertPanel({
             ))}
           </select>
         </label>
+        <label>
+          状态
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as AlertStatusFilter)}
+          >
+            {alertStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {error ? <div className="inline-notice error">{error}</div> : null}
       {groups.length === 0 && !isLoading ? <div className="inline-notice">暂无告警</div> : null}
@@ -1117,11 +1525,13 @@ function AlertPanel({
             <thead>
               <tr>
                 <th>等级</th>
+                <th>状态</th>
                 <th>类型</th>
                 <th>标的</th>
                 <th>触发项</th>
                 <th>触发时间</th>
                 <th>原因</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -1140,6 +1550,11 @@ function AlertPanel({
                     <td>
                       <span className={`alert-severity ${group.severity}`}>
                         {alertSeverityLabel(group.severity)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`alert-status ${group.status}`}>
+                        {alertStatusLabel(group.status)}
                       </span>
                     </td>
                     <td>{alertGroupKindLabel(group)}</td>
@@ -1162,11 +1577,22 @@ function AlertPanel({
                     <td>{formatInteger(group.alert_count)}</td>
                     <td>{formatDateTime(group.triggered_at)}</td>
                     <td title={group.message}>{group.message}</td>
+                    <td>
+                      <AlertActionButtons
+                        alertIds={group.alerts.map((alert) => alert.alert_id)}
+                        currentStatus={group.status}
+                        onUpdate={onUpdateAlertStatus}
+                      />
+                    </td>
                   </tr>
                   {expandedGroupId === group.group_id ? (
                     <tr className="alert-detail-row">
-                      <td colSpan={6}>
-                        <AlertGroupDetails group={group} onSelectAlert={onSelectAlert} />
+                      <td colSpan={8}>
+                        <AlertGroupDetails
+                          group={group}
+                          onSelectAlert={onSelectAlert}
+                          onUpdateAlertStatus={onUpdateAlertStatus}
+                        />
                       </td>
                     </tr>
                   ) : null}
@@ -1182,10 +1608,12 @@ function AlertPanel({
 
 function AlertGroupDetails({
   group,
-  onSelectAlert
+  onSelectAlert,
+  onUpdateAlertStatus
 }: {
   group: MarketAlertGroup;
   onSelectAlert: (group: MarketAlertGroup) => void;
+  onUpdateAlertStatus: (alertIds: string[], status: AlertStatus) => void;
 }) {
   return (
     <div className="alert-group-detail">
@@ -1206,12 +1634,65 @@ function AlertGroupDetails({
             <span className={`alert-severity ${alert.severity}`}>
               {alertSeverityLabel(alert.severity)}
             </span>
+            <span className={`alert-status ${alert.status}`}>
+              {alertStatusLabel(alert.status)}
+            </span>
             <strong>{alertKindLabel(alert.kind)}</strong>
             <span>{formatAlertValue(alert)} / {formatAlertThreshold(alert)}</span>
             <p>{alert.message}</p>
+            <AlertActionButtons
+              alertIds={[alert.alert_id]}
+              currentStatus={alert.status}
+              onUpdate={onUpdateAlertStatus}
+            />
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AlertActionButtons({
+  alertIds,
+  currentStatus,
+  onUpdate
+}: {
+  alertIds: string[];
+  currentStatus: AlertStatus;
+  onUpdate: (alertIds: string[], status: AlertStatus) => void;
+}) {
+  return (
+    <div className="alert-actions">
+      <button
+        type="button"
+        disabled={currentStatus === "read"}
+        onClick={(event) => {
+          event.stopPropagation();
+          onUpdate(alertIds, "read");
+        }}
+      >
+        已读
+      </button>
+      <button
+        type="button"
+        disabled={currentStatus === "handled"}
+        onClick={(event) => {
+          event.stopPropagation();
+          onUpdate(alertIds, "handled");
+        }}
+      >
+        处理
+      </button>
+      <button
+        type="button"
+        disabled={currentStatus === "ignored"}
+        onClick={(event) => {
+          event.stopPropagation();
+          onUpdate(alertIds, "ignored");
+        }}
+      >
+        忽略
+      </button>
     </div>
   );
 }
@@ -1293,7 +1774,119 @@ function StockControls({
   );
 }
 
-function StockTable({ stocks }: { stocks: StockItem[] }) {
+function StockDetailPanel({
+  detail,
+  selectedStockId,
+  isLoading,
+  error,
+  onSelectIndustry,
+  onUpdateAlertStatus
+}: {
+  detail: StockDetail | null;
+  selectedStockId: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onSelectIndustry: (industryCode: string) => void;
+  onUpdateAlertStatus: (alertIds: string[], status: AlertStatus) => void;
+}) {
+  if (!selectedStockId) {
+    return (
+      <div className="stock-detail empty-stock-detail">
+        <p className="eyebrow">个股详情</p>
+        <h3>选择一只股票查看快照与告警历史</h3>
+      </div>
+    );
+  }
+  if (error) {
+    return <div className="inline-notice error">{error}</div>;
+  }
+  if (isLoading && !detail) {
+    return <div className="inline-notice">加载 {selectedStockId} 详情...</div>;
+  }
+  if (!detail) {
+    return null;
+  }
+
+  const stock = detail.snapshot;
+  return (
+    <div className="stock-detail">
+      <div className="stock-detail-header">
+        <div>
+          <p className="eyebrow">个股详情</p>
+          <h3>
+            {stock.name} <span className="mono">{stock.security_id}</span>
+          </h3>
+        </div>
+        <button
+          className="retry-button"
+          type="button"
+          onClick={() => onSelectIndustry(stock.industry_code ?? "UNKNOWN")}
+        >
+          {displayIndustry(stock.industry_code)}
+        </button>
+      </div>
+      {isLoading ? <div className="inline-notice">刷新个股详情...</div> : null}
+      <div className="stock-detail-grid">
+        <DetailItem label="最新价" value={formatNumber(stock.price)} />
+        <DetailItem label="涨跌幅" value={formatSignedPercent(stock.change_pct)} />
+        <DetailItem label="成交额" value={formatAmount(stock.amount)} />
+        <DetailItem label="成交量" value={formatNumber(stock.volume)} />
+        <DetailItem label="换手率" value={formatPercentFromNullable(stock.turnover_rate)} />
+        <DetailItem label="量比" value={formatNumber(stock.volume_ratio)} />
+        <DetailItem label="交易状态" value={stock.is_suspended ? "停牌" : "交易中"} />
+        <DetailItem label="市盈率 TTM" value={formatNumber(stock.pe_ttm)} />
+        <DetailItem label="市净率" value={formatNumber(stock.pb)} />
+        <DetailItem label="总市值" value={formatAmount(stock.market_cap)} />
+        <DetailItem label="快照时间" value={formatDateTime(stock.snapshot_time)} />
+        <DetailItem label="数据源" value={stock.source} />
+        <DetailItem label="抓取时间" value={formatDateTime(stock.fetched_at)} />
+      </div>
+      <div className="stock-alert-history">
+        <div className="section-heading compact-heading">
+          <div>
+            <p className="eyebrow">告警历史</p>
+            <h3>最近触发记录</h3>
+          </div>
+          <span>{formatInteger(detail.alerts.length)} 条</span>
+        </div>
+        {detail.alerts.length === 0 ? (
+          <div className="inline-notice">该股票暂无持久化告警记录</div>
+        ) : (
+          <div className="alert-trigger-list stock-alert-list">
+            {detail.alerts.map((alert) => (
+              <div className="alert-trigger" key={alert.alert_id}>
+                <span className={`alert-severity ${alert.severity}`}>
+                  {alertSeverityLabel(alert.severity)}
+                </span>
+                <span className={`alert-status ${alert.status}`}>
+                  {alertStatusLabel(alert.status)}
+                </span>
+                <strong>{alertKindLabel(alert.kind)}</strong>
+                <span>{formatDateTime(alert.triggered_at)}</span>
+                <p>{alert.message}</p>
+                <AlertActionButtons
+                  alertIds={[alert.alert_id]}
+                  currentStatus={alert.status}
+                  onUpdate={onUpdateAlertStatus}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StockTable({
+  stocks,
+  selectedStockId,
+  onSelectStock
+}: {
+  stocks: StockItem[];
+  selectedStockId: string | null;
+  onSelectStock: (securityId: string) => void;
+}) {
   if (stocks.length === 0) {
     return <div className="inline-notice">没有匹配的股票</div>;
   }
@@ -1313,9 +1906,30 @@ function StockTable({ stocks }: { stocks: StockItem[] }) {
         </thead>
         <tbody>
           {stocks.map((stock) => (
-            <tr key={stock.security_id}>
-              <td className="mono">{stock.security_id}</td>
-              <td>{stock.name}</td>
+            <tr
+              className="clickable-row"
+              key={stock.security_id}
+              aria-selected={selectedStockId === stock.security_id}
+              onClick={() => onSelectStock(stock.security_id)}
+            >
+              <td>
+                <button
+                  className="link-button mono"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectStock(stock.security_id);
+                  }}
+                >
+                  {stock.security_id}
+                </button>
+              </td>
+              <td>
+                <span className="stock-name-cell">
+                  {stock.name}
+                  {stock.is_suspended ? <span className="stock-status suspended">停牌</span> : null}
+                </span>
+              </td>
               <td>{formatNumber(stock.price)}</td>
               <td className={valueClass(stock.change_pct)}>{formatSignedPercent(stock.change_pct)}</td>
               <td>{formatAmount(stock.amount)}</td>

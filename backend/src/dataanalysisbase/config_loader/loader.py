@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import yaml
 from pydantic import BaseModel, ValidationError
@@ -20,7 +20,8 @@ T = TypeVar("T", bound=BaseModel)
 
 def load_settings() -> Settings:
     try:
-        settings = Settings()
+        root = _project_root()
+        settings = cast(Any, Settings)(_env_file=root / ".env")
     except ValidationError as exc:
         raise ConfigError(f"Invalid environment settings: {exc}") from exc
     return _resolve_settings_paths(settings)
@@ -81,9 +82,11 @@ def _resolve_project_path(root: Path, path: Path) -> Path:
 
 
 def _project_root() -> Path:
-    for path in (Path.cwd(), *Path.cwd().parents):
-        if (path / "backend").is_dir() and (path / "config").is_dir():
-            return path
+    roots = (Path.cwd(), Path(__file__).resolve())
+    for root in roots:
+        for path in (root, *root.parents):
+            if (path / "backend").is_dir() and (path / "config").is_dir():
+                return path
     return Path.cwd()
 
 

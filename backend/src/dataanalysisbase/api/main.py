@@ -1,22 +1,28 @@
 """FastAPI application entrypoint."""
 
+from datetime import datetime
 from typing import Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response, status
+from pydantic import BaseModel, ConfigDict
 
 from dataanalysisbase import __version__
 from dataanalysisbase.api.market_alerts import (
+    AlertStatusUpdate,
     MarketAlert,
     MarketAlertGroup,
     get_market_alert_groups,
     get_market_alerts,
+    update_market_alert_status,
 )
 from dataanalysisbase.api.market_data import (
     IndustryItem,
     MarketOverview,
+    StockDetail,
     StockItem,
     get_industries,
     get_market_overview,
+    get_stock_detail,
     get_stocks_page,
 )
 from dataanalysisbase.api.sync_jobs import (
@@ -31,6 +37,27 @@ from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
 from dataanalysisbase.storage.repositories.page import Page
 
 app = FastAPI(title="DataAnalysisBase API", version=__version__)
+
+
+class MarketSyncFailureSummary(BaseModel):
+    """Failure counts over recent API-triggered sync jobs."""
+
+    model_config = ConfigDict(frozen=True)
+
+    recent: int
+    total: int
+    failed: int
+    partial: int
+    latest_failed_at: datetime | None = None
+
+
+class MarketSyncHistory(BaseModel):
+    """Paginated sync job history with recent failure statistics."""
+
+    model_config = ConfigDict(frozen=True)
+
+    jobs: Page[MarketSyncJobStatus]
+    failure_summary: MarketSyncFailureSummary
 
 
 def _sync_job_repo() -> SyncJobRepo:
@@ -78,6 +105,16 @@ def market_alert_groups(limit: int = Query(default=50, ge=1, le=100)) -> list[Ma
     return get_market_alert_groups(limit=limit)
 
 
+@app.patch("/api/v1/alerts/market/{alert_id}")
+def patch_market_alert(alert_id: str, update: AlertStatusUpdate) -> MarketAlert:
+    """Update lifecycle state for one persisted market surveillance alert."""
+
+    alert = update_market_alert_status(alert_id, update.status)
+    if alert is None:
+        raise HTTPException(status_code=404, detail="market alert not found")
+    return alert
+
+
 @app.get("/api/v1/market/overview")
 def market_overview() -> MarketOverview:
     """Return the latest market overview aggregate."""
@@ -122,6 +159,27 @@ def market_sync_jobs(limit: int = Query(default=20, ge=1, le=100)) -> list[Marke
     return _market_sync_jobs.list_recent(limit)
 
 
+@app.get("/api/v1/sync/market/history")
+def market_sync_history(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    recent: int = Query(default=20, ge=1, le=200),
+) -> MarketSyncHistory:
+    """Return paginated API-triggered market sync jobs and recent failure stats."""
+
+    summary = _market_sync_jobs.failure_summary(recent=recent)
+    return MarketSyncHistory(
+        jobs=_market_sync_jobs.list_page(page=page, size=size),
+        failure_summary=MarketSyncFailureSummary(
+            recent=recent,
+            total=_int_summary_value(summary.get("total")),
+            failed=_int_summary_value(summary.get("failed")),
+            partial=_int_summary_value(summary.get("partial")),
+            latest_failed_at=_datetime_summary_value(summary.get("latest_failed_at")),
+        ),
+    )
+
+
 @app.get("/api/v1/sync/market/{job_id}")
 def market_sync_status(job_id: str) -> MarketSyncJobStatus:
     """Return one API-triggered market sync job status."""
@@ -140,6 +198,14 @@ def cancel_market_sync(job_id: str) -> MarketSyncJobStatus:
     if job is None:
         raise HTTPException(status_code=404, detail="market sync job not found")
     return job
+
+
+def _int_summary_value(value: object) -> int:
+    return int(value) if isinstance(value, (int, float, str)) and value != "" else 0
+
+
+def _datetime_summary_value(value: object) -> datetime | None:
+    return value if isinstance(value, datetime) else None
 
 
 @app.get("/api/v1/stocks")
@@ -163,6 +229,16 @@ def stocks(
         q=q,
         filter=filter,
     )
+
+
+@app.get("/api/v1/stocks/{security_id}")
+def stock_detail(
+    security_id: str,
+    alert_limit: int = Query(default=20, ge=1, le=100),
+) -> StockDetail:
+    """Return the latest snapshot and recent alert history for one stock."""
+
+    return get_stock_detail(security_id, alert_limit=alert_limit)
 
 
 @app.get("/api/v1/industries")

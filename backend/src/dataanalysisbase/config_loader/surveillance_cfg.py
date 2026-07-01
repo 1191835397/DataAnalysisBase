@@ -1,5 +1,6 @@
 """Sync schedule and surveillance rule configuration models."""
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -36,6 +37,8 @@ class SyncSchedule(BaseModel):
 
     version: str
     timezone: str = "Asia/Shanghai"
+    holidays: list[date] = Field(default_factory=list)
+    makeup_trading_days: list[date] = Field(default_factory=list)
     jobs: dict[str, JobConfig]
 
 

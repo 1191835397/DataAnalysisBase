@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS api_sync_jobs (
     cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
     message TEXT NOT NULL DEFAULT '',
     elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+    artifact_path TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -65,6 +66,9 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
     pb DOUBLE,
     market_cap DOUBLE,
     industry_code VARCHAR,
+    listing_date DATE,
+    ex_dividend BOOLEAN NOT NULL DEFAULT FALSE,
+    is_suspended BOOLEAN NOT NULL DEFAULT FALSE,
     source VARCHAR NOT NULL,
     fetched_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -85,6 +89,9 @@ CREATE TABLE IF NOT EXISTS latest_market_snapshot (
     pb DOUBLE,
     market_cap DOUBLE,
     industry_code VARCHAR,
+    listing_date DATE,
+    ex_dividend BOOLEAN NOT NULL DEFAULT FALSE,
+    is_suspended BOOLEAN NOT NULL DEFAULT FALSE,
     source VARCHAR NOT NULL,
     fetched_at TIMESTAMPTZ NOT NULL
 );
@@ -113,4 +120,27 @@ CREATE TABLE IF NOT EXISTS industry_snapshots (
     source VARCHAR NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (snapshot_time, industry_code, source)
+);
+
+CREATE TABLE IF NOT EXISTS surveillance_alerts (
+    alert_id VARCHAR PRIMARY KEY,
+    rule_id VARCHAR,
+    severity VARCHAR NOT NULL,
+    kind VARCHAR NOT NULL,
+    status VARCHAR NOT NULL DEFAULT 'new',
+    title VARCHAR NOT NULL,
+    message TEXT NOT NULL,
+    first_triggered_at TIMESTAMPTZ NOT NULL,
+    last_triggered_at TIMESTAMPTZ NOT NULL,
+    trigger_count INTEGER NOT NULL DEFAULT 1,
+    security_id VARCHAR,
+    name VARCHAR,
+    industry_code VARCHAR,
+    metric VARCHAR,
+    value DOUBLE,
+    threshold DOUBLE,
+    snapshot_time TIMESTAMPTZ,
+    source VARCHAR,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

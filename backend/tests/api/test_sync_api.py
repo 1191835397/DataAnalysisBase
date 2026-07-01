@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -14,7 +16,7 @@ from dataanalysisbase.domain.enums import RunStatus
 from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
 
 
-def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
+def test_start_market_sync_creates_completed_job(monkeypatch, tmp_path: Path) -> None:
     def fake_run_market_sync(snapshot_time: datetime) -> SyncResult:
         return SyncResult(
             task="market_bulk_sync",
@@ -25,7 +27,7 @@ def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
             snapshot_time=snapshot_time,
         )
 
-    _patch_job_store(monkeypatch, fake_run_market_sync)
+    _patch_job_store(monkeypatch, fake_run_market_sync, tmp_path)
     client = TestClient(api_main.app)
 
     response = client.post("/api/v1/sync/market")
@@ -46,9 +48,15 @@ def test_start_market_sync_creates_completed_job(monkeypatch) -> None:
     assert status_payload["finished_at"] is not None
     assert status_payload["elapsed_seconds"] >= 0
     assert status_payload["message"] == "同步 success, 实际 2 / 预期 2, 缺失 0"
+    assert status_payload["artifact_path"] is not None
+    artifact = json.loads(Path(status_payload["artifact_path"]).read_text(encoding="utf-8"))
+    assert artifact["job_id"] == payload["job_id"]
+    assert artifact["status"] == "success"
+    assert artifact["result"]["actual"] == 2
+    assert artifact["result"]["logs"] == status_payload["result"]["logs"]
 
 
-def test_latest_market_sync_returns_latest_job(monkeypatch) -> None:
+def test_latest_market_sync_returns_latest_job(monkeypatch, tmp_path: Path) -> None:
     def fake_run_market_sync(snapshot_time: datetime) -> SyncResult:
         return SyncResult(
             task="market_bulk_sync",
@@ -59,7 +67,7 @@ def test_latest_market_sync_returns_latest_job(monkeypatch) -> None:
             snapshot_time=snapshot_time,
         )
 
-    _patch_job_store(monkeypatch, fake_run_market_sync)
+    _patch_job_store(monkeypatch, fake_run_market_sync, tmp_path)
     client = TestClient(api_main.app)
 
     start_response = client.post("/api/v1/sync/market")
@@ -73,7 +81,7 @@ def test_latest_market_sync_returns_latest_job(monkeypatch) -> None:
     assert payload["result"]["actual"] == 3
 
 
-def test_latest_market_sync_returns_204_without_job(monkeypatch) -> None:
+def test_latest_market_sync_returns_204_without_job(monkeypatch, tmp_path: Path) -> None:
     _patch_job_store(
         monkeypatch,
         lambda snapshot_time: SyncResult(
@@ -84,6 +92,7 @@ def test_latest_market_sync_returns_204_without_job(monkeypatch) -> None:
             missing=0,
             snapshot_time=snapshot_time,
         ),
+        tmp_path,
     )
     client = TestClient(api_main.app)
 
@@ -123,6 +132,42 @@ def test_market_sync_jobs_returns_recent_jobs(monkeypatch) -> None:
     assert len(payload) == 1
     assert payload[0]["job_id"] == "job-1"
     assert payload[0]["result"]["actual"] == 3
+
+
+def test_market_sync_history_returns_page_and_failure_summary(monkeypatch) -> None:
+    created_at = datetime.fromisoformat("2026-06-28T15:30:00+08:00")
+    job = MarketSyncJobStatus(
+        job_id="job-1",
+        status=RunStatus.FAILED,
+        created_at=created_at,
+        finished_at=created_at,
+        error="provider timeout",
+        elapsed_seconds=12,
+        artifact_path="data/artifacts/sync/job-1.json",
+    )
+    monkeypatch.setattr(
+        api_main,
+        "_market_sync_jobs",
+        StaticJobStore(job),
+    )
+    client = TestClient(api_main.app)
+
+    response = client.get("/api/v1/sync/market/history?page=1&size=5&recent=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["jobs"]["total"] == 1
+    assert payload["jobs"]["page"] == 1
+    assert payload["jobs"]["size"] == 5
+    assert payload["jobs"]["items"][0]["job_id"] == "job-1"
+    assert payload["jobs"]["items"][0]["artifact_path"] == "data/artifacts/sync/job-1.json"
+    assert payload["failure_summary"] == {
+        "recent": 10,
+        "total": 1,
+        "failed": 1,
+        "partial": 0,
+        "latest_failed_at": "2026-06-28T15:30:00+08:00",
+    }
 
 
 def test_start_market_sync_rejects_concurrent_run(monkeypatch) -> None:
@@ -179,11 +224,11 @@ def test_cancel_market_sync_returns_404_for_unknown_job(monkeypatch) -> None:
     assert response.json()["detail"] == "market sync job not found"
 
 
-def test_market_sync_job_records_failed_exception(monkeypatch) -> None:
+def test_market_sync_job_records_failed_exception(monkeypatch, tmp_path: Path) -> None:
     def fake_run_market_sync(snapshot_time: datetime) -> SyncResult:
         raise RuntimeError("provider timeout")
 
-    _patch_job_store(monkeypatch, fake_run_market_sync)
+    _patch_job_store(monkeypatch, fake_run_market_sync, tmp_path)
     client = TestClient(api_main.app)
 
     response = client.post("/api/v1/sync/market")
@@ -196,6 +241,12 @@ def test_market_sync_job_records_failed_exception(monkeypatch) -> None:
     assert status_payload["error"] == "provider timeout"
     assert status_payload["result"]["errors"] == ["provider timeout"]
     assert status_payload["message"] == "同步 failed, 实际 0 / 预期 0, 缺失 0"
+    assert status_payload["artifact_path"] is not None
+    artifact = json.loads(Path(status_payload["artifact_path"]).read_text(encoding="utf-8"))
+    assert artifact["status"] == "failed"
+    assert artifact["error"] == "provider timeout"
+    assert artifact["result"]["logs"][0]["stage"] == "sync_exception"
+    assert artifact["result"]["logs"][0]["level"] == "error"
 
 
 def test_market_sync_job_reports_slow_running_message() -> None:
@@ -327,8 +378,12 @@ def test_market_sync_job_store_lists_recent_persisted_jobs(tmp_path) -> None:
     assert recent[0].result.missing == 1
 
 
-def _patch_job_store(monkeypatch, sync_fn) -> None:
-    monkeypatch.setattr(api_main, "_market_sync_jobs", MarketSyncJobStore(sync_fn))
+def _patch_job_store(monkeypatch, sync_fn, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        api_main,
+        "_market_sync_jobs",
+        MarketSyncJobStore(sync_fn, artifact_dir=tmp_path / "artifacts"),
+    )
 
 
 def _sync_job_repo(db_path) -> SyncJobRepo:
@@ -361,3 +416,20 @@ class StaticJobStore:
 
     def list_recent(self, _limit: int) -> list[MarketSyncJobStatus]:
         return [] if self.job is None else [self.job]
+
+    def list_page(self, *, page: int, size: int):
+        from dataanalysisbase.storage.repositories.page import Page
+
+        jobs = [] if self.job is None else [self.job]
+        return Page(items=jobs, total=len(jobs), page=page, size=size)
+
+    def failure_summary(self, *, recent: int) -> dict[str, object]:
+        jobs = [] if self.job is None else [self.job]
+        failed_jobs = [job for job in jobs if job.status == RunStatus.FAILED]
+        partial_jobs = [job for job in jobs if job.status == RunStatus.PARTIAL]
+        return {
+            "total": len(jobs[:recent]),
+            "failed": len(failed_jobs[:recent]),
+            "partial": len(partial_jobs[:recent]),
+            "latest_failed_at": failed_jobs[0].created_at if failed_jobs else None,
+        }

@@ -5,6 +5,7 @@ from dataanalysisbase.domain.contracts import (
     MarketRow,
     MarketSyncJobStatus,
     RawDataset,
+    SyncLogEntry,
     SyncResult,
 )
 from dataanalysisbase.domain.enums import (
@@ -35,6 +36,7 @@ __all__ = [
     "SecurityId",
     "SecurityType",
     "Severity",
+    "SyncLogEntry",
     "SyncResult",
     "to_source_code",
 ]

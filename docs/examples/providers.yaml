@@ -36,6 +36,14 @@ providers:
       - index
       - macro
 
+  baostock:
+    enabled: false
+    priority: 4
+    rate_limit:
+      requests_per_minute: 60
+    datasets:
+      - industry_mapping
+
   cninfo:
     enabled: false  # M4 阶段启用
     priority: 1

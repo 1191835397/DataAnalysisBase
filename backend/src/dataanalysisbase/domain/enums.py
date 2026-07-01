@@ -47,6 +47,13 @@ class AlertSeverity(StrEnum):
     INFO = "info"
 
 
+class AlertStatus(StrEnum):
+    NEW = "new"
+    READ = "read"
+    HANDLED = "handled"
+    IGNORED = "ignored"
+
+
 class RunStatus(StrEnum):
     RUNNING = "running"
     SUCCESS = "success"

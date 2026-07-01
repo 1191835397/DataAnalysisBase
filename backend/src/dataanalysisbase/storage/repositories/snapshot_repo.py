@@ -30,6 +30,7 @@ class SnapshotRepo(BaseRepo):
         if not rows:
             return 0
 
+        self._ensure_snapshot_columns()
         values = [_market_row_values(row) for row in rows]
         with self.store.transaction() as conn:
             conn.executemany(
@@ -44,9 +45,9 @@ class SnapshotRepo(BaseRepo):
                 INSERT INTO market_snapshots (
                     snapshot_time, security_id, name, price, change_pct, volume, amount,
                     turnover_rate, volume_ratio, pe_ttm, pb, market_cap, industry_code,
-                    source, fetched_at
+                    listing_date, ex_dividend, is_suspended, source, fetched_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -107,11 +108,13 @@ class SnapshotRepo(BaseRepo):
         return rows[0] if rows else None
 
     def get_snapshot(self, snapshot_time: datetime) -> list[MarketRow]:
+        self._ensure_snapshot_columns()
         rows = self.store.query(
             """
             SELECT snapshot_time, security_id, name, price, change_pct, volume, amount,
                    turnover_rate, volume_ratio, pe_ttm, pb, market_cap, industry_code,
-                   source, fetched_at
+                   listing_date, coalesce(ex_dividend, FALSE) AS ex_dividend,
+                   coalesce(is_suspended, FALSE) AS is_suspended, source, fetched_at
             FROM market_snapshots
             WHERE snapshot_time = ?
             ORDER BY security_id
@@ -133,6 +136,67 @@ class SnapshotRepo(BaseRepo):
         )
         return rows[0]["snapshot_time"] if rows else None
 
+    def backfill_industries(
+        self,
+        snapshot_time: datetime,
+        industry_by_security: dict[str, str],
+    ) -> int:
+        """Backfill missing industry codes for one snapshot from a local mapping."""
+
+        if not industry_by_security:
+            return 0
+
+        values = [
+            (industry, snapshot_time, security_id)
+            for security_id, industry in industry_by_security.items()
+            if industry
+        ]
+        if not values:
+            return 0
+
+        missing_rows = self.store.query(
+            """
+            SELECT security_id
+            FROM market_snapshots
+            WHERE snapshot_time = ?
+              AND (industry_code IS NULL OR industry_code = 'UNKNOWN' OR industry_code = '')
+            """,
+            [snapshot_time],
+        )
+        backfilled = sum(
+            1 for row in missing_rows if row["security_id"] in industry_by_security
+        )
+        if backfilled == 0:
+            return 0
+
+        with self.store.transaction() as conn:
+            conn.executemany(
+                """
+                UPDATE market_snapshots
+                SET industry_code = ?
+                WHERE snapshot_time = ?
+                  AND security_id = ?
+                  AND (industry_code IS NULL OR industry_code = 'UNKNOWN' OR industry_code = '')
+                """,
+                values,
+            )
+        return backfilled
+
+    def _ensure_snapshot_columns(self) -> None:
+        _ensure_column(self.store, "market_snapshots", "listing_date", "DATE")
+        _ensure_column(
+            self.store,
+            "market_snapshots",
+            "ex_dividend",
+            "BOOLEAN",
+        )
+        _ensure_column(
+            self.store,
+            "market_snapshots",
+            "is_suspended",
+            "BOOLEAN",
+        )
+
 
 def _market_row_values(row: MarketRow) -> list[Any]:
     return [
@@ -149,6 +213,24 @@ def _market_row_values(row: MarketRow) -> list[Any]:
         row.pb,
         row.market_cap,
         row.industry_code,
+        row.listing_date,
+        row.ex_dividend,
+        row.is_suspended,
         row.source,
         row.fetched_at,
     ]
+
+
+def _ensure_column(store: Any, table_name: str, column_name: str, column_type: str) -> None:
+    rows = store.query(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = ?
+          AND column_name = ?
+        """,
+        [table_name, column_name],
+    )
+    if rows:
+        return
+    store.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")

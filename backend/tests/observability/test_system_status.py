@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 
 from dataanalysisbase.config_loader.settings import Settings
@@ -38,6 +38,98 @@ def test_compute_data_status_reports_stale_after_threshold() -> None:
         latest_snapshot_time=snapshot_time,
         last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
         now=now,
+    )
+
+    assert status == DataStatus.STALE
+
+
+def test_compute_data_status_ignores_after_hours_for_trading_sessions() -> None:
+    snapshot_time = datetime.fromisoformat("2026-06-26T14:50:00+08:00")
+    now = datetime.fromisoformat("2026-06-26T16:00:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
+    )
+
+    assert status == DataStatus.FRESH
+
+
+def test_compute_data_status_counts_only_open_session_minutes() -> None:
+    snapshot_time = datetime.fromisoformat("2026-06-26T11:20:00+08:00")
+    now = datetime.fromisoformat("2026-06-26T13:20:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
+    )
+
+    assert status == DataStatus.FRESH
+
+
+def test_compute_data_status_ignores_weekend_for_trading_days_only() -> None:
+    snapshot_time = datetime.fromisoformat("2026-06-26T14:50:00+08:00")
+    now = datetime.fromisoformat("2026-06-29T09:45:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
+    )
+
+    assert status == DataStatus.FRESH
+
+
+def test_compute_data_status_ignores_configured_holidays() -> None:
+    snapshot_time = datetime.fromisoformat("2026-09-30T14:50:00+08:00")
+    now = datetime.fromisoformat("2026-10-01T10:30:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
+        holidays={datetime.fromisoformat("2026-10-01T00:00:00+08:00").date()},
+    )
+
+    assert status == DataStatus.FRESH
+
+
+def test_compute_data_status_counts_configured_makeup_trading_days() -> None:
+    snapshot_time = datetime.fromisoformat("2026-09-27T09:30:00+08:00")
+    now = datetime.fromisoformat("2026-09-27T10:30:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
+        makeup_trading_days={datetime.fromisoformat("2026-09-27T00:00:00+08:00").date()},
+    )
+
+    assert status == DataStatus.STALE
+
+
+def test_compute_data_status_reports_stale_during_long_open_session_gap() -> None:
+    snapshot_time = datetime.fromisoformat("2026-06-26T10:00:00+08:00")
+    now = datetime.fromisoformat("2026-06-26T10:46:00+08:00")
+
+    status = compute_data_status(
+        latest_snapshot_time=snapshot_time,
+        last_market_run=_run_status(snapshot_time, RunStatus.SUCCESS),
+        now=now,
+        trading_sessions=_trading_sessions(),
+        trading_days_only=True,
     )
 
     assert status == DataStatus.STALE
@@ -284,3 +376,7 @@ def _run_status(snapshot_time: datetime, status: RunStatus) -> MarketRunStatus:
         started_at=snapshot_time,
         finished_at=snapshot_time,
     )
+
+
+def _trading_sessions() -> tuple[tuple[time, time], ...]:
+    return ((time(9, 30), time(11, 30)), (time(13, 0), time(15, 0)))

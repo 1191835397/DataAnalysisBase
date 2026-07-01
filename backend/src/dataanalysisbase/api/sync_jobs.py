@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
 from fastapi import BackgroundTasks
 
-from dataanalysisbase.domain.contracts import MarketSyncJobStatus, SyncResult
+from dataanalysisbase.config_loader import load_settings
+from dataanalysisbase.domain.contracts import MarketSyncJobStatus, SyncLogEntry, SyncResult
 from dataanalysisbase.domain.enums import RunStatus
 from dataanalysisbase.storage import DuckDBStore, SyncJobRepo
+from dataanalysisbase.storage.repositories.page import Page
 
 MarketSyncFn = Callable[[datetime], SyncResult]
 JobStoreFactory = Callable[[], SyncJobRepo]
@@ -33,9 +37,11 @@ class MarketSyncJobStore:
         sync_fn: MarketSyncFn,
         *,
         job_store_factory: JobStoreFactory | None = None,
+        artifact_dir: Path | None = None,
     ) -> None:
         self._sync_fn = sync_fn
         self._job_store_factory = job_store_factory
+        self._artifact_dir = artifact_dir
         self._lock = Lock()
         self._jobs: dict[str, MarketSyncJobStatus] = {}
         self._active_job_id: str | None = None
@@ -84,6 +90,52 @@ class MarketSyncJobStore:
                 self._jobs[job.job_id] = job
             return [_copy_job(job) for job in jobs]
 
+    def list_page(self, *, page: int, size: int) -> Page[MarketSyncJobStatus]:
+        self._ensure_restored()
+        safe_page = max(page, 1)
+        safe_size = max(size, 1)
+        with self._lock:
+            jobs, total = self._load_persisted_jobs_page(safe_page, safe_size)
+            for index, job in enumerate(jobs):
+                cached_job = self._jobs.get(job.job_id)
+                if cached_job is not None:
+                    job = cached_job
+                    jobs[index] = cached_job
+                self._jobs[job.job_id] = job
+            return Page(
+                items=[_copy_job(job) for job in jobs],
+                total=total,
+                page=safe_page,
+                size=safe_size,
+            )
+
+    def failure_summary(self, *, recent: int) -> dict[str, object]:
+        self._ensure_restored()
+        safe_recent = max(recent, 1)
+        with self._lock:
+            if self._job_store_factory is None:
+                jobs = sorted(
+                    self._jobs.values(),
+                    key=lambda job: job.created_at,
+                    reverse=True,
+                )[:safe_recent]
+                failed_jobs = [job for job in jobs if job.status == RunStatus.FAILED]
+                partial_jobs = [job for job in jobs if job.status == RunStatus.PARTIAL]
+                latest_failed_at = (
+                    max((job.created_at for job in failed_jobs), default=None)
+                )
+                return {
+                    "total": len(jobs),
+                    "failed": len(failed_jobs),
+                    "partial": len(partial_jobs),
+                    "latest_failed_at": latest_failed_at,
+                }
+            repo, store = self._open_job_repo()
+            try:
+                return repo.failure_summary(recent=safe_recent)
+            finally:
+                store.close()
+
     def get(self, job_id: str) -> MarketSyncJobStatus | None:
         self._ensure_restored()
         with self._lock:
@@ -125,6 +177,14 @@ class MarketSyncJobStore:
                 missing=0,
                 snapshot_time=snapshot_time,
                 errors=[error],
+                logs=[
+                    _sync_log(
+                        "sync_exception",
+                        "市场同步执行异常",
+                        level="error",
+                        error=error,
+                    )
+                ],
             )
 
         with self._lock:
@@ -137,6 +197,15 @@ class MarketSyncJobStore:
                 update={
                     "status": RunStatus.FAILED,
                     "errors": [*result.errors, error],
+                    "logs": [
+                        *result.logs,
+                        _sync_log(
+                            "sync_cancel",
+                            "用户请求取消, 同步结果标记为失败",
+                            level="warning",
+                            job_id=job_id,
+                        ),
+                    ],
                 }
             )
 
@@ -146,6 +215,7 @@ class MarketSyncJobStore:
             finished_at=datetime.now().astimezone(),
             result=result,
             error=error,
+            artifact_path=self._write_artifact(job_id, result, error=error),
             clear_active=True,
         )
 
@@ -198,6 +268,21 @@ class MarketSyncJobStore:
         finally:
             store.close()
 
+    def _load_persisted_jobs_page(
+        self,
+        page: int,
+        size: int,
+    ) -> tuple[list[MarketSyncJobStatus], int]:
+        if self._job_store_factory is None:
+            jobs = sorted(self._jobs.values(), key=lambda job: job.created_at, reverse=True)
+            offset = (page - 1) * size
+            return jobs[offset : offset + size], len(jobs)
+        repo, store = self._open_job_repo()
+        try:
+            return repo.list_page(page=page, size=size)
+        finally:
+            store.close()
+
     def _persist_locked(self, job: MarketSyncJobStatus) -> None:
         if self._job_store_factory is None:
             return
@@ -213,6 +298,34 @@ class MarketSyncJobStore:
             raise RuntimeError("job store factory is not configured")
         sync_job_repo = repo()
         return sync_job_repo, sync_job_repo.store
+
+    def _write_artifact(
+        self,
+        job_id: str,
+        result: SyncResult,
+        *,
+        error: str | None,
+    ) -> str | None:
+        artifact_dir = self._resolved_artifact_dir()
+        try:
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            path = artifact_dir / f"{job_id}.json"
+            payload = {
+                "job_id": job_id,
+                "status": result.status.value,
+                "finished_at": datetime.now().astimezone().isoformat(),
+                "result": result.model_dump(mode="json"),
+                "error": error,
+            }
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            return str(path)
+        except OSError:
+            return None
+
+    def _resolved_artifact_dir(self) -> Path:
+        if self._artifact_dir is not None:
+            return self._artifact_dir
+        return load_settings().data_dir / "artifacts" / "sync"
 
 
 def _copy_job(job: MarketSyncJobStatus) -> MarketSyncJobStatus:
@@ -253,3 +366,19 @@ def _job_message(job: MarketSyncJobStatus, elapsed_seconds: int) -> str:
     if job.error:
         return job.error
     return f"同步 {job.status.value}"
+
+
+def _sync_log(
+    stage: str,
+    message: str,
+    *,
+    level: str = "info",
+    **details: object,
+) -> SyncLogEntry:
+    return SyncLogEntry(
+        at=datetime.now().astimezone(),
+        stage=stage,
+        level=level,
+        message=message,
+        details={key: value for key, value in details.items() if value is not None},
+    )

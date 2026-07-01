@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +14,15 @@ from pydantic import BaseModel
 from dataanalysisbase.delivery.plan import (
     build_sync_industry_mapping_plan,
     build_sync_market_plan,
+    build_sync_trade_calendar_plan,
 )
-from dataanalysisbase.delivery.sync import run_industry_mapping_sync, run_market_sync
+from dataanalysisbase.delivery.sync import (
+    inspect_industry_mapping_coverage,
+    run_industry_mapping_backfill,
+    run_industry_mapping_sync,
+    run_market_sync,
+    run_trade_calendar_sync,
+)
 from dataanalysisbase.observability.system_status import (
     build_runtime_status,
     has_errors,
@@ -43,6 +50,12 @@ def main(argv: list[str] | None = None) -> int:
         return _sync_market(args)
     if args.command == "sync" and args.sync_command == "industry-mapping":
         return _sync_industry_mapping(args)
+    if args.command == "sync" and args.sync_command == "trade-calendar":
+        return _sync_trade_calendar(args)
+    if args.command == "sync" and args.sync_command == "industry-backfill":
+        return _sync_industry_backfill(args)
+    if args.command == "industry" and args.industry_command == "coverage":
+        return _industry_coverage(args)
 
     parser.print_help()
     return 2
@@ -82,7 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
     plan_sync_industry_mapping.add_argument(
         "--provider",
-        choices=["akshare", "efinance", "tushare"],
+        choices=["akshare", "baostock", "efinance", "tushare"],
     )
     plan_sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
 
@@ -100,10 +113,38 @@ def _build_parser() -> argparse.ArgumentParser:
     sync_industry_mapping.add_argument("--config-dir", type=Path, default=None)
     sync_industry_mapping.add_argument(
         "--provider",
-        choices=["akshare", "efinance", "tushare"],
+        choices=["akshare", "baostock", "efinance", "tushare"],
     )
     sync_industry_mapping.add_argument("--execute", action="store_true")
     sync_industry_mapping.add_argument("--json", action="store_true", dest="json_output")
+    sync_trade_calendar = sync_subparsers.add_parser(
+        "trade-calendar",
+        help="Refresh sync_schedule holidays and makeup trading days",
+    )
+    sync_trade_calendar.add_argument("--config-dir", type=Path, default=None)
+    sync_trade_calendar.add_argument("--year", type=int, default=None)
+    sync_trade_calendar.add_argument("--through-date", type=_parse_date, default=None)
+    sync_trade_calendar.add_argument("--execute", action="store_true")
+    sync_trade_calendar.add_argument("--json", action="store_true", dest="json_output")
+    sync_industry_backfill = sync_subparsers.add_parser(
+        "industry-backfill",
+        help="Apply local industry mapping to latest market snapshot",
+    )
+    sync_industry_backfill.add_argument("--config-dir", type=Path, default=None)
+    sync_industry_backfill.add_argument("--mapping-path", type=Path, default=None)
+    sync_industry_backfill.add_argument("--execute", action="store_true")
+    sync_industry_backfill.add_argument("--json", action="store_true", dest="json_output")
+
+    industry_parser = subparsers.add_parser("industry", help="Industry mapping diagnostics")
+    industry_subparsers = industry_parser.add_subparsers(dest="industry_command")
+    industry_coverage = industry_subparsers.add_parser(
+        "coverage",
+        help="Inspect local industry mapping coverage",
+    )
+    industry_coverage.add_argument("--config-dir", type=Path, default=None)
+    industry_coverage.add_argument("--mapping-path", type=Path, default=None)
+    industry_coverage.add_argument("--missing-output", type=Path, default=None)
+    industry_coverage.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -167,6 +208,7 @@ def _plan_sync_industry_mapping(args: argparse.Namespace) -> int:
         print("plan: sync-industry-mapping")
         print("dry-run: true")
         print(f"provider: {plan.provider}")
+        print(f"provider_chain: {', '.join(plan.provider_chain) or 'none'}")
         print(f"target_file: {plan.target_file}")
         for candidate in plan.provider_candidates:
             token = (
@@ -221,6 +263,7 @@ def _sync_industry_mapping(args: argparse.Namespace) -> int:
             print("dry-run: true")
             print("pass --execute to call provider and write industry mapping file")
             print(f"provider: {plan.provider}")
+            print(f"provider_chain: {', '.join(plan.provider_chain) or 'none'}")
             print(f"target_file: {plan.target_file}")
             for candidate in plan.provider_candidates:
                 token = (
@@ -249,6 +292,123 @@ def _sync_industry_mapping(args: argparse.Namespace) -> int:
     return 1 if result.status == "failed" else 0
 
 
+def _sync_trade_calendar(args: argparse.Namespace) -> int:
+    if not args.execute:
+        plan = build_sync_trade_calendar_plan(
+            args.config_dir,
+            year=args.year,
+            through_date=args.through_date,
+        )
+        if args.json_output:
+            print(json.dumps(plan.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        else:
+            print("dry-run: true")
+            print("pass --execute to call provider and write sync_schedule.yaml")
+            print(f"provider: {plan.provider}")
+            print(f"target_file: {plan.target_file}")
+            print(f"year: {plan.year}")
+            print(f"through_date: {plan.through_date or 'auto'}")
+        return 0
+
+    result = run_trade_calendar_sync(
+        config_dir=args.config_dir,
+        year=args.year,
+        through_date=args.through_date,
+    )
+    if args.json_output:
+        print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"task: {result.task}")
+        print(f"status: {result.status}")
+        print(f"source: {result.source}")
+        print(f"path: {result.path}")
+        print(f"year: {result.year}")
+        print(f"coverage_start: {result.coverage_start}")
+        print(f"coverage_end: {result.coverage_end}")
+        print(f"trade_dates: {result.trade_dates}")
+        print(f"holidays: {result.holidays}")
+        print(f"makeup_trading_days: {result.makeup_trading_days}")
+        for error in result.errors:
+            print(f"error: {error}")
+    return 1 if result.status == "failed" else 0
+
+
+def _sync_industry_backfill(args: argparse.Namespace) -> int:
+    if not args.execute:
+        from dataanalysisbase.config_loader import load_settings
+        from dataanalysisbase.delivery.sync import _default_industry_mapping_path
+
+        settings = load_settings()
+        config_dir = args.config_dir or settings.config_dir
+        mapping_path = args.mapping_path or _default_industry_mapping_path(
+            settings.data_dir,
+            config_dir,
+        )
+        payload = {
+            "command": "industry-backfill",
+            "dry_run": True,
+            "config_dir": str(config_dir),
+            "duckdb_path": str(settings.duckdb_path),
+            "mapping_path": str(mapping_path),
+            "will_write_database": False,
+            "notes": [
+                "dry-run only; no DuckDB write is performed",
+                "pass --execute to update missing industry_code values in latest snapshot",
+            ],
+        }
+        if args.json_output:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print("dry-run: true")
+            print("pass --execute to backfill latest snapshot industries")
+            print(f"mapping_path: {mapping_path}")
+            print(f"duckdb_path: {settings.duckdb_path}")
+        return 0
+
+    result = run_industry_mapping_backfill(
+        config_dir=args.config_dir,
+        mapping_path=args.mapping_path,
+    )
+    if args.json_output:
+        print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"task: {result.task}")
+        print(f"status: {result.status}")
+        print(f"path: {result.path}")
+        print(f"snapshot_time: {result.snapshot_time}")
+        print(f"mapping_records: {result.mapping_records}")
+        print(f"backfilled: {result.backfilled}")
+        for error in result.errors:
+            print(f"error: {error}")
+    return 1 if result.status == "failed" else 0
+
+
+def _industry_coverage(args: argparse.Namespace) -> int:
+    result = inspect_industry_mapping_coverage(
+        config_dir=args.config_dir,
+        mapping_path=args.mapping_path,
+        missing_output=args.missing_output,
+    )
+    if args.json_output:
+        print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"task: {result.task}")
+        print(f"status: {result.status}")
+        print(f"path: {result.path}")
+        print(f"snapshot_time: {result.snapshot_time}")
+        print(f"total_snapshot_records: {result.total_snapshot_records}")
+        print(f"mapped_snapshot_records: {result.mapped_snapshot_records}")
+        print(f"unknown_snapshot_records: {result.unknown_snapshot_records}")
+        print(f"mapping_records: {result.mapping_records}")
+        print(f"missing_mapping_records: {result.missing_mapping_records}")
+        print(f"coverage_ratio: {result.coverage_ratio:.4f}")
+        if result.missing_output is not None:
+            print(f"missing_output: {result.missing_output}")
+        for error in result.errors:
+            print(f"error: {error}")
+    return 1 if result.status == "failed" else 0
+
+
 def _emit(results: Sequence[BaseModel], *, json_output: bool) -> None:
     if json_output:
         payload: list[dict[str, Any]] = [result.model_dump(mode="json") for result in results]
@@ -265,6 +425,14 @@ def _parse_datetime(raw: str) -> datetime:
         return datetime.fromisoformat(raw)
     except ValueError as exc:
         msg = f"Invalid datetime: {raw}"
+        raise argparse.ArgumentTypeError(msg) from exc
+
+
+def _parse_date(raw: str) -> date:
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as exc:
+        msg = f"Invalid date: {raw}"
         raise argparse.ArgumentTypeError(msg) from exc
 
 

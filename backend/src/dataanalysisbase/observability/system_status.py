@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,6 +45,15 @@ CONFIG_LOADERS = {
 }
 
 DEFAULT_STALE_AFTER_MINUTES = 45
+
+
+@dataclass(frozen=True)
+class _FreshnessPolicy:
+    timezone: str
+    trading_sessions: tuple[tuple[time, time], ...]
+    trading_days_only: bool
+    holidays: frozenset[date]
+    makeup_trading_days: frozenset[date]
 
 
 class CheckResult(BaseModel):
@@ -141,6 +153,7 @@ def build_runtime_status(
     providers = _provider_health(settings.config_dir)
     provider_connectivity = _provider_connectivity(settings.config_dir) if include_online else []
     generated_at = datetime.now(UTC)
+    freshness_policy = _market_bulk_freshness_policy(settings.config_dir)
     return RuntimeStatus(
         generated_at=generated_at,
         run_mode=settings.run_mode,
@@ -148,6 +161,23 @@ def build_runtime_status(
             latest_snapshot_time=latest_snapshot_time,
             last_market_run=snapshot_state.last_market_run,
             now=generated_at,
+            trading_sessions=(
+                freshness_policy.trading_sessions if freshness_policy is not None else None
+            ),
+            trading_timezone=(
+                freshness_policy.timezone if freshness_policy is not None else "Asia/Shanghai"
+            ),
+            trading_days_only=(
+                freshness_policy.trading_days_only if freshness_policy is not None else False
+            ),
+            holidays=(
+                freshness_policy.holidays if freshness_policy is not None else frozenset()
+            ),
+            makeup_trading_days=(
+                freshness_policy.makeup_trading_days
+                if freshness_policy is not None
+                else frozenset()
+            ),
         ),
         latest_snapshot_time=latest_snapshot_time,
         duckdb_path=str(settings.duckdb_path),
@@ -335,6 +365,11 @@ def compute_data_status(
     last_market_run: MarketRunStatus | None,
     now: datetime,
     stale_after_minutes: int = DEFAULT_STALE_AFTER_MINUTES,
+    trading_sessions: Sequence[tuple[time, time]] | None = None,
+    trading_timezone: str = "Asia/Shanghai",
+    trading_days_only: bool = False,
+    holidays: set[date] | frozenset[date] | None = None,
+    makeup_trading_days: set[date] | frozenset[date] | None = None,
 ) -> DataStatus:
     """Compute the single runtime freshness status used by CLI/API/UI."""
 
@@ -349,12 +384,130 @@ def compute_data_status(
     if last_market_run is not None and last_market_run.status == "partial":
         return DataStatus.PARTIAL
 
-    age = _as_utc(now) - _as_utc(latest_snapshot_time)
+    age = _freshness_age(
+        latest_snapshot_time=latest_snapshot_time,
+        now=now,
+        trading_sessions=trading_sessions,
+        trading_timezone=trading_timezone,
+        trading_days_only=trading_days_only,
+        holidays=holidays or frozenset(),
+        makeup_trading_days=makeup_trading_days or frozenset(),
+    )
     return (
         DataStatus.STALE
         if age > timedelta(minutes=stale_after_minutes)
         else DataStatus.FRESH
     )
+
+
+def _market_bulk_freshness_policy(config_dir: Path) -> _FreshnessPolicy | None:
+    try:
+        schedule = load_sync_schedule(config_dir)
+    except ConfigError:
+        return None
+
+    job = schedule.jobs.get("market_bulk_snapshot")
+    if job is None or not job.trading_sessions:
+        return None
+
+    try:
+        sessions = tuple(
+            (_parse_session_time(session.start), _parse_session_time(session.end))
+            for session in job.trading_sessions
+        )
+    except ValueError:
+        return None
+    return _FreshnessPolicy(
+        timezone=schedule.timezone,
+        trading_sessions=sessions,
+        trading_days_only=job.trading_days_only,
+        holidays=frozenset(schedule.holidays),
+        makeup_trading_days=frozenset(schedule.makeup_trading_days),
+    )
+
+
+def _parse_session_time(value: str) -> time:
+    return time.fromisoformat(value)
+
+
+def _freshness_age(
+    *,
+    latest_snapshot_time: datetime,
+    now: datetime,
+    trading_sessions: Sequence[tuple[time, time]] | None,
+    trading_timezone: str,
+    trading_days_only: bool,
+    holidays: set[date] | frozenset[date],
+    makeup_trading_days: set[date] | frozenset[date],
+) -> timedelta:
+    if not trading_sessions:
+        return max(_as_utc(now) - _as_utc(latest_snapshot_time), timedelta())
+
+    try:
+        zone = ZoneInfo(trading_timezone)
+    except ZoneInfoNotFoundError:
+        return max(_as_utc(now) - _as_utc(latest_snapshot_time), timedelta())
+
+    start = _as_utc(latest_snapshot_time).astimezone(zone)
+    end = _as_utc(now).astimezone(zone)
+    if end <= start:
+        return timedelta()
+
+    active_age = timedelta()
+    current_day = start.date()
+    while current_day <= end.date():
+        if _counts_for_freshness(
+            current_day,
+            trading_days_only,
+            holidays=holidays,
+            makeup_trading_days=makeup_trading_days,
+        ):
+            active_age += _active_age_for_day(
+                current_day=current_day,
+                start=start,
+                end=end,
+                trading_sessions=trading_sessions,
+                zone=zone,
+            )
+        current_day += timedelta(days=1)
+    return active_age
+
+
+def _active_age_for_day(
+    *,
+    current_day: date,
+    start: datetime,
+    end: datetime,
+    trading_sessions: Sequence[tuple[time, time]],
+    zone: ZoneInfo,
+) -> timedelta:
+    active_age = timedelta()
+    for session_start, session_end in trading_sessions:
+        if session_end <= session_start:
+            continue
+        window_start = datetime.combine(current_day, session_start, tzinfo=zone)
+        window_end = datetime.combine(current_day, session_end, tzinfo=zone)
+        overlap_start = max(start, window_start)
+        overlap_end = min(end, window_end)
+        if overlap_end > overlap_start:
+            active_age += overlap_end - overlap_start
+    return active_age
+
+
+def _counts_for_freshness(
+    current_day: date,
+    trading_days_only: bool,
+    *,
+    holidays: set[date] | frozenset[date],
+    makeup_trading_days: set[date] | frozenset[date],
+) -> bool:
+    if not trading_days_only:
+        return True
+    if current_day in makeup_trading_days:
+        return True
+    if current_day in holidays:
+        return False
+    return current_day.weekday() < 5
 
 
 def _as_utc(value: datetime) -> datetime:

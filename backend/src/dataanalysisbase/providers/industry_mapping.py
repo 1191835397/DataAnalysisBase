@@ -9,6 +9,9 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
+from dataanalysisbase.common.errors import InvalidSecurityId
+from dataanalysisbase.domain.symbols import SecurityId
+
 
 class IndustryMappingProvider(Protocol):
     """Provider protocol for security-to-industry mapping sync."""
@@ -29,6 +32,40 @@ class IndustryMappingSyncResult(BaseModel):
     source: str
     path: str
     records: int
+    errors: list[str] = []
+
+
+class IndustryMappingBackfillResult(BaseModel):
+    """Result of applying a local industry mapping to market snapshots."""
+
+    model_config = ConfigDict(frozen=True)
+
+    task: str = "industry_mapping_backfill"
+    status: str
+    path: str
+    snapshot_time: str | None
+    mapping_records: int
+    backfilled: int
+    errors: list[str] = []
+
+
+class IndustryMappingCoverageResult(BaseModel):
+    """Coverage audit for the latest market snapshot and local mapping file."""
+
+    model_config = ConfigDict(frozen=True)
+
+    task: str = "industry_mapping_coverage"
+    status: str
+    path: str
+    snapshot_time: str | None
+    total_snapshot_records: int
+    mapped_snapshot_records: int
+    unknown_snapshot_records: int
+    mapping_records: int
+    usable_mapping_records: int
+    missing_mapping_records: int
+    coverage_ratio: float
+    missing_output: str | None = None
     errors: list[str] = []
 
 
@@ -74,3 +111,35 @@ def write_industry_mapping_csv(path: Path, mapping: dict[str, str]) -> int:
         for security_id, industry in sorted(mapping.items()):
             writer.writerow({"security_id": security_id, "industry": industry})
     return len(mapping)
+
+
+def write_missing_industry_mapping_csv(
+    path: Path,
+    rows: list[dict[str, str]],
+) -> int:
+    """Write a stable CSV template for securities missing industry mapping."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["security_id", "name", "industry"])
+        writer.writeheader()
+        for row in sorted(rows, key=lambda item: item["security_id"]):
+            writer.writerow(
+                {
+                    "security_id": row["security_id"],
+                    "name": row["name"],
+                    "industry": row.get("industry", ""),
+                }
+            )
+    return len(rows)
+
+
+def normalize_security_id(raw: object) -> str | None:
+    """Normalize a provider/file security identifier to SYMBOL.MARKET when possible."""
+
+    if raw is None:
+        return None
+    try:
+        return str(SecurityId.parse(str(raw)))
+    except InvalidSecurityId:
+        return None

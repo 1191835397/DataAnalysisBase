@@ -2,10 +2,13 @@ import type {
   IndustryItem,
   MarketAlert,
   MarketAlertGroup,
+  MarketSyncHistory,
   MarketOverview,
   MarketSyncJob,
   Page,
   RuntimeStatus,
+  AlertStatus,
+  StockDetail,
   StockItem,
   StockQuery,
 } from "./types";
@@ -31,7 +34,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const [status, overview, industries, stocks] = await Promise.all([
     fetchJson<RuntimeStatus>("/api/v1/system/status"),
     fetchJson<MarketOverview>("/api/v1/market/overview"),
-    fetchJson<IndustryItem[]>("/api/v1/industries?limit=12"),
+    fetchJson<IndustryItem[]>("/api/v1/industries?limit=80"),
     fetchStocksPage({
       page: 1,
       size: 12,
@@ -45,6 +48,13 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
 export function fetchStocksPage(query: StockQuery): Promise<Page<StockItem>> {
   return fetchJson<Page<StockItem>>(`/api/v1/stocks?${buildQuery(query)}`);
+}
+
+export function fetchStockDetail(securityId: string, alertLimit = 20): Promise<StockDetail> {
+  const params = new URLSearchParams({ alert_limit: String(alertLimit) });
+  return fetchJson<StockDetail>(
+    `/api/v1/stocks/${encodeURIComponent(securityId)}?${params.toString()}`
+  );
 }
 
 export function fetchIndustryStocks(
@@ -79,6 +89,19 @@ export function fetchMarketSyncJobs(limit = 20): Promise<MarketSyncJob[]> {
   return fetchJson<MarketSyncJob[]>(`/api/v1/sync/market/jobs?${params.toString()}`);
 }
 
+export function fetchMarketSyncHistory(
+  page = 1,
+  size = 20,
+  recent = 20
+): Promise<MarketSyncHistory> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    recent: String(recent)
+  });
+  return fetchJson<MarketSyncHistory>(`/api/v1/sync/market/history?${params.toString()}`);
+}
+
 export function fetchMarketAlerts(limit = 50): Promise<MarketAlert[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   return fetchJson<MarketAlert[]>(`/api/v1/alerts/market?${params.toString()}`);
@@ -87,6 +110,17 @@ export function fetchMarketAlerts(limit = 50): Promise<MarketAlert[]> {
 export function fetchMarketAlertGroups(limit = 50): Promise<MarketAlertGroup[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   return fetchJson<MarketAlertGroup[]>(`/api/v1/alerts/market/groups?${params.toString()}`);
+}
+
+export function updateMarketAlertStatus(
+  alertId: string,
+  status: AlertStatus
+): Promise<MarketAlert> {
+  return fetchJson<MarketAlert>(`/api/v1/alerts/market/${encodeURIComponent(alertId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status })
+  });
 }
 
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

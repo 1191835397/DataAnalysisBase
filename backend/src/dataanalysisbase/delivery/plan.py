@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict
 
@@ -78,8 +80,27 @@ class SyncIndustryMappingPlan(BaseModel):
     run_mode: str
     config_dir: str
     provider: str
+    provider_chain: list[str]
     provider_candidates: list[ProviderCandidatePlan]
     target_file: str
+    will_call_provider: bool
+    will_write_file: bool
+    notes: list[str]
+
+
+class SyncTradeCalendarPlan(BaseModel):
+    """Dry-run plan for refreshing trading calendar overrides."""
+
+    model_config = ConfigDict(frozen=True)
+
+    command: str
+    dry_run: bool
+    run_mode: str
+    config_dir: str
+    provider: str
+    target_file: str
+    year: int
+    through_date: date | None
     will_call_provider: bool
     will_write_file: bool
     notes: list[str]
@@ -126,6 +147,36 @@ def build_sync_market_plan(config_dir: Path | None = None) -> SyncMarketPlan:
     )
 
 
+def build_sync_trade_calendar_plan(
+    config_dir: Path | None = None,
+    *,
+    year: int | None = None,
+    through_date: date | None = None,
+) -> SyncTradeCalendarPlan:
+    """Build a read-only preview for refreshing calendar overrides."""
+
+    settings = load_settings()
+    resolved_config_dir = config_dir or settings.config_dir
+    selected_year = _calendar_year(year=year, through_date=through_date)
+    return SyncTradeCalendarPlan(
+        command="sync-trade-calendar",
+        dry_run=True,
+        run_mode=settings.run_mode,
+        config_dir=str(resolved_config_dir),
+        provider="akshare",
+        target_file=str(resolved_config_dir / "sync_schedule.yaml"),
+        year=selected_year,
+        through_date=through_date,
+        will_call_provider=False,
+        will_write_file=False,
+        notes=[
+            "dry-run only; no provider request is made",
+            "dry-run only; sync_schedule.yaml is not written",
+            "real execution updates holidays and makeup_trading_days for the selected year window",
+        ],
+    )
+
+
 def build_sync_industry_mapping_plan(
     config_dir: Path | None = None,
     *,
@@ -152,6 +203,7 @@ def build_sync_industry_mapping_plan(
         token_values={"DAB_TUSHARE_TOKEN": settings.tushare_token},
     )
     selected_provider = _selected_provider(candidates, provider)
+    provider_chain = _provider_chain(candidates, provider)
 
     return SyncIndustryMappingPlan(
         command="sync-industry-mapping",
@@ -159,6 +211,7 @@ def build_sync_industry_mapping_plan(
         run_mode=settings.run_mode,
         config_dir=str(resolved_config_dir),
         provider=selected_provider,
+        provider_chain=provider_chain,
         provider_candidates=candidates,
         target_file=str(target_file),
         will_call_provider=False,
@@ -166,7 +219,7 @@ def build_sync_industry_mapping_plan(
         notes=[
             "dry-run only; no provider request is made",
             "dry-run only; no industry mapping file is written",
-            "real execution fetches provider-native industry board membership",
+            "real execution merges provider_chain in order; earlier providers win conflicts",
         ],
     )
 
@@ -174,12 +227,24 @@ def build_sync_industry_mapping_plan(
 def _selected_provider(candidates: list[ProviderCandidatePlan], provider: str | None) -> str:
     if provider is not None:
         return provider
-    enabled_candidates = [candidate for candidate in candidates if candidate.enabled]
-    return (
-        min(enabled_candidates, key=lambda candidate: candidate.priority).name
-        if enabled_candidates
-        else "none"
-    )
+    chain = _provider_chain(candidates, provider)
+    return chain[0] if chain else "none"
+
+
+def _provider_chain(candidates: list[ProviderCandidatePlan], provider: str | None) -> list[str]:
+    if provider is not None:
+        return [provider]
+    return [
+        candidate.name
+        for candidate in sorted(candidates, key=lambda item: (item.priority, item.name))
+        if _is_usable_industry_mapping_candidate(candidate)
+    ]
+
+
+def _is_usable_industry_mapping_candidate(candidate: ProviderCandidatePlan) -> bool:
+    if candidate.token_env == "DAB_TUSHARE_TOKEN" and not candidate.token_configured:
+        return False
+    return candidate.supports_dataset
 
 
 def _provider_candidates(
@@ -205,3 +270,11 @@ def _provider_candidates(
         )
         if dataset in provider.datasets
     ]
+
+
+def _calendar_year(*, year: int | None, through_date: date | None) -> int:
+    if year is not None:
+        return year
+    if through_date is not None:
+        return through_date.year
+    return datetime.now(ZoneInfo("Asia/Shanghai")).year

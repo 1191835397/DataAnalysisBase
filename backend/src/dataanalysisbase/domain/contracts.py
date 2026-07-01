@@ -1,11 +1,11 @@
 """Cross-module DTOs."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dataanalysisbase.domain.enums import DatasetType, RunStatus
+from dataanalysisbase.domain.enums import AlertSeverity, AlertStatus, DatasetType, RunStatus
 
 
 class RawDataset(BaseModel):
@@ -38,6 +38,19 @@ class MarketRow(BaseModel):
     pb: float | None = None
     market_cap: float | None = None
     industry_code: str | None = None
+    listing_date: date | None = None
+    ex_dividend: bool = False
+    is_suspended: bool = False
+
+
+class SyncLogEntry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    at: datetime
+    stage: str
+    level: str = "info"
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class SyncResult(BaseModel):
@@ -50,6 +63,7 @@ class SyncResult(BaseModel):
     missing: int
     snapshot_time: datetime | None = None
     errors: list[str] = Field(default_factory=list)
+    logs: list[SyncLogEntry] = Field(default_factory=list)
 
 
 class MarketSyncJobStatus(BaseModel):
@@ -65,6 +79,30 @@ class MarketSyncJobStatus(BaseModel):
     cancel_requested: bool = False
     elapsed_seconds: int = 0
     message: str = "正在抓取 AKShare 全市场快照"
+    artifact_path: str | None = None
+
+
+class SurveillanceAlertRecord(BaseModel):
+    """Persisted market surveillance alert with lifecycle metadata."""
+
+    alert_id: str
+    rule_id: str | None = None
+    severity: AlertSeverity
+    kind: str
+    status: AlertStatus = AlertStatus.NEW
+    title: str
+    message: str
+    first_triggered_at: datetime
+    last_triggered_at: datetime
+    trigger_count: int = 1
+    security_id: str | None = None
+    name: str | None = None
+    industry_code: str | None = None
+    metric: str | None = None
+    value: float | None = None
+    threshold: float | None = None
+    snapshot_time: datetime | None = None
+    source: str | None = None
 
 
 class FusionResult(BaseModel):

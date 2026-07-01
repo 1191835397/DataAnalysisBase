@@ -21,6 +21,15 @@ export type SyncResult = {
   missing: number;
   snapshot_time: string | null;
   errors: string[];
+  logs: SyncLogEntry[];
+};
+
+export type SyncLogEntry = {
+  at: string;
+  stage: string;
+  level: string;
+  message: string;
+  details: Record<string, unknown>;
 };
 
 export type MarketSyncJob = {
@@ -34,12 +43,28 @@ export type MarketSyncJob = {
   cancel_requested: boolean;
   elapsed_seconds: number;
   message: string;
+  artifact_path: string | null;
+};
+
+export type MarketSyncFailureSummary = {
+  recent: number;
+  total: number;
+  failed: number;
+  partial: number;
+  latest_failed_at: string | null;
+};
+
+export type MarketSyncHistory = {
+  jobs: Page<MarketSyncJob>;
+  failure_summary: MarketSyncFailureSummary;
 };
 
 export type AlertSeverity = "high" | "medium" | "info";
+export type AlertStatus = "new" | "read" | "handled" | "ignored";
 
 export type MarketAlert = {
   alert_id: string;
+  rule_id: string | null;
   severity: AlertSeverity;
   kind:
     | "data_stale"
@@ -50,9 +75,13 @@ export type MarketAlert = {
     | "limit_down"
     | "volume_surge"
     | "extreme_move";
+  status: AlertStatus;
   title: string;
   message: string;
   triggered_at: string;
+  first_triggered_at: string | null;
+  last_triggered_at: string | null;
+  trigger_count: number;
   security_id: string | null;
   name: string | null;
   industry_code: string | null;
@@ -66,9 +95,12 @@ export type MarketAlertGroup = {
   group_id: string;
   severity: AlertSeverity;
   kinds: MarketAlert["kind"][];
+  status: AlertStatus;
   title: string;
   message: string;
   triggered_at: string;
+  first_triggered_at: string | null;
+  last_triggered_at: string | null;
   alert_count: number;
   security_id: string | null;
   name: string | null;
@@ -95,9 +127,22 @@ export type StockItem = {
   name: string;
   price: number | null;
   change_pct: number | null;
+  volume: number | null;
   amount: number | null;
+  turnover_rate: number | null;
   volume_ratio: number | null;
+  pe_ttm: number | null;
+  pb: number | null;
+  market_cap: number | null;
   industry_code: string | null;
+  is_suspended: boolean;
+  source: string;
+  fetched_at: string;
+};
+
+export type StockDetail = {
+  snapshot: StockItem;
+  alerts: MarketAlert[];
 };
 
 export type IndustryItem = {
