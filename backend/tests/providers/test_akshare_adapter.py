@@ -109,6 +109,92 @@ def test_akshare_adapter_maps_explicit_suspended_status() -> None:
     assert batch.rows[1].is_suspended is True
 
 
+def test_akshare_adapter_marks_suspended_from_suspend_notify_source() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    seen_dates: list[date] = []
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                },
+                {
+                    "代码": "000001",
+                    "名称": "平安银行",
+                    "最新价": "10.00",
+                    "成交量": "100",
+                    "成交额": "1000",
+                },
+            ]
+        ),
+        suspended_fetcher=lambda day: seen_dates.append(day)
+        or FakeFrame(
+            [
+                {"股票代码": "000001", "停牌日期": "2026-06-23"},
+                {"股票代码": "600519", "停牌日期": "2026-06-22"},
+            ]
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert seen_dates == [date(2026, 6, 23)]
+    assert batch.rows[0].is_suspended is False
+    assert batch.rows[1].is_suspended is True
+
+
+def test_akshare_adapter_prefers_explicit_suspended_field_over_suspend_list() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                    "is_suspended": False,
+                }
+            ]
+        ),
+        suspended_fetcher=lambda _day: FakeFrame(
+            [{"股票代码": "600519", "停牌日期": "2026-06-23"}]
+        ),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].is_suspended is False
+
+
+def test_akshare_adapter_keeps_snapshot_when_suspended_fetch_fails() -> None:
+    snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    adapter = AkshareAdapter(
+        spot_fetcher=lambda: FakeFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": "1688.00",
+                    "成交量": "123456",
+                    "成交额": "208000000",
+                }
+            ]
+        ),
+        suspended_fetcher=lambda _day: _raise_fetch_error(),
+    )
+
+    batch = adapter.fetch_market_snapshot(snapshot_time)
+
+    assert batch.rows[0].security_id == "600519.SH"
+    assert batch.rows[0].is_suspended is False
+
+
 def test_akshare_adapter_enriches_listing_date_from_stock_lists() -> None:
     snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
     adapter = AkshareAdapter(

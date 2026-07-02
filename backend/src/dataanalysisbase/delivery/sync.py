@@ -419,7 +419,8 @@ def inspect_industry_mapping_coverage(
     )
 
     try:
-        mapping = _load_industry_mapping(target_path)
+        raw_mapping_records = load_industry_mapping_file(target_path)
+        mapping = _normalize_industry_mapping(raw_mapping_records)
     except Exception as exc:
         return IndustryMappingCoverageResult(
             status="failed",
@@ -453,7 +454,7 @@ def inspect_industry_mapping_coverage(
             total_snapshot_records=0,
             mapped_snapshot_records=0,
             unknown_snapshot_records=0,
-            mapping_records=len(mapping),
+            mapping_records=len(raw_mapping_records),
             usable_mapping_records=len(mapping),
             missing_mapping_records=0,
             coverage_ratio=0,
@@ -494,7 +495,7 @@ def inspect_industry_mapping_coverage(
         total_snapshot_records=total,
         mapped_snapshot_records=mapped_snapshot_records,
         unknown_snapshot_records=unknown_snapshot_records,
-        mapping_records=len(mapping),
+        mapping_records=len(raw_mapping_records),
         usable_mapping_records=len(mapping),
         missing_mapping_records=len(missing_rows),
         coverage_ratio=0 if total == 0 else mapped_snapshot_records / total,
@@ -579,13 +580,18 @@ def _default_industry_mapping_path(data_dir: Path, config_dir: Path) -> Path:
 
 def _load_industry_mapping(path: Path) -> dict[str, str]:
     records = load_industry_mapping_file(path)
+    return _normalize_industry_mapping(records)
+
+
+def _normalize_industry_mapping(records: list[dict[str, object]]) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for record in records:
         security_id = _string_field(record, "security_id", "code", "symbol")
         industry = _string_field(record, "industry", "industry_code", "industry_name")
         normalized_security_id = normalize_security_id(security_id)
-        if normalized_security_id and industry:
-            mapping[normalized_security_id] = industry
+        if normalized_security_id is None or not _has_industry(industry):
+            continue
+        mapping[normalized_security_id] = str(industry).strip()
     return mapping
 
 

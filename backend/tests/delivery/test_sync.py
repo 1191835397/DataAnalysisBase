@@ -503,7 +503,13 @@ def test_inspect_industry_mapping_coverage_reports_missing_rows(
     mapping_path = data_dir / "industry_mapping.csv"
     missing_path = tmp_path / "missing.csv"
     mapping_path.parent.mkdir(parents=True)
-    mapping_path.write_text("security_id,industry\n600519,白酒\n", encoding="utf-8")
+    mapping_path.write_text(
+        "security_id,industry\n"
+        "600519,白酒\n"
+        "300750.SZ,UNKNOWN\n"
+        "000001.SZ,\n",
+        encoding="utf-8",
+    )
     snapshot_time = datetime(2026, 6, 23, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
     store = DuckDBStore(duckdb_path)
     store.init_schema()
@@ -533,7 +539,8 @@ def test_inspect_industry_mapping_coverage_reports_missing_rows(
     assert result.total_snapshot_records == 3
     assert result.mapped_snapshot_records == 1
     assert result.unknown_snapshot_records == 2
-    assert result.mapping_records == 1
+    assert result.mapping_records == 3
+    assert result.usable_mapping_records == 1
     assert result.missing_mapping_records == 2
     assert result.coverage_ratio == 1 / 3
     assert result.missing_output == str(missing_path)

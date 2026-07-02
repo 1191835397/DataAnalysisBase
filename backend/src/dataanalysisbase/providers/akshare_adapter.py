@@ -33,6 +33,7 @@ class AkshareAdapter:
         listing_date_fetchers: tuple[Callable[[], Any], ...] | None = None,
         ex_dividend_fetcher: Callable[[date], Any] | None = None,
         ex_dividend_history_fetchers: tuple[Callable[[], Any], ...] | None = None,
+        suspended_fetcher: Callable[[date], Any] | None = None,
         trade_calendar_fetcher: Callable[[], Any] | None = None,
     ) -> None:
         self._spot_fetcher = spot_fetcher
@@ -44,6 +45,7 @@ class AkshareAdapter:
         self._listing_date_fetchers = listing_date_fetchers
         self._ex_dividend_fetcher = ex_dividend_fetcher
         self._ex_dividend_history_fetchers = ex_dividend_history_fetchers
+        self._suspended_fetcher = suspended_fetcher
         self._trade_calendar_fetcher = trade_calendar_fetcher
 
     def fetch_market_snapshot(self, snapshot_time: datetime) -> MarketSnapshotBatch:
@@ -55,6 +57,7 @@ class AkshareAdapter:
             industry_by_code = self._fetch_industry_by_code()
             listing_date_by_code = self._fetch_listing_date_by_code()
             ex_dividend_codes = self._fetch_ex_dividend_codes(snapshot_time.date())
+            suspended_codes = self._fetch_suspended_codes(snapshot_time.date())
             rows = [
                 _row_from_record(
                     record,
@@ -62,6 +65,7 @@ class AkshareAdapter:
                     industry_by_code=industry_by_code,
                     listing_date_by_code=listing_date_by_code,
                     ex_dividend_codes=ex_dividend_codes,
+                    suspended_codes=suspended_codes,
                 )
                 for record in records
             ]
@@ -344,6 +348,55 @@ class AkshareAdapter:
             for period in report_periods
         )
 
+    def _fetch_suspended_codes(self, snapshot_date: date) -> set[str]:
+        fetcher = self._suspended_fetcher
+        if fetcher is None:
+            if self._spot_fetcher is not None or self._spot_fetchers is not None:
+                return set()
+            try:
+                ak = importlib.import_module("akshare")
+            except ImportError:
+                return set()
+            provider_fetcher = getattr(ak, "news_trade_notify_suspend_baidu", None)
+            if callable(provider_fetcher):
+                notify_fetcher: Callable[..., Any] = provider_fetcher
+
+                def fetcher(day: date) -> Any:
+                    return notify_fetcher(date=day.strftime("%Y%m%d"))
+
+            else:
+                provider_fetcher = getattr(ak, "stock_tfp_em", None)
+                if not callable(provider_fetcher):
+                    return set()
+                fallback_fetcher: Callable[..., Any] = provider_fetcher
+
+                def fetcher(day: date) -> Any:
+                    return fallback_fetcher(date=day.strftime("%Y%m%d"))
+
+        if fetcher is None:
+            return set()
+
+        try:
+            records = _records_from_frame(fetcher(snapshot_date))
+        except Exception:
+            return set()
+
+        suspended_codes: set[str] = set()
+        for record in records:
+            event_date = _date_value(
+                record,
+                "停牌日期",
+                "停牌时间",
+                "suspend_date",
+                "date",
+            )
+            if event_date is not None and event_date != snapshot_date:
+                continue
+            security_id = _security_id_from_record(record)
+            if security_id is not None:
+                suspended_codes.add(security_id)
+        return suspended_codes
+
     def _fetch_bj_industry_by_code(self) -> dict[str, str]:
         fetcher = self._bj_stock_info_fetcher
         if fetcher is None:
@@ -471,6 +524,7 @@ def _row_from_record(
     industry_by_code: Mapping[str, str],
     listing_date_by_code: Mapping[str, date],
     ex_dividend_codes: set[str],
+    suspended_codes: set[str],
 ) -> MarketRow:
     raw_code = _string_value(record, "代码", "code", "symbol")
     raw_name = _string_value(record, "名称", "name")
@@ -535,7 +589,13 @@ def _row_from_record(
             if explicit_ex_dividend is not None
             else security_id in ex_dividend_codes
         ),
-        is_suspended=_is_suspended(record, price=price, volume=volume, amount=amount),
+        is_suspended=_is_suspended(
+            record,
+            fallback=security_id in suspended_codes,
+            price=price,
+            volume=volume,
+            amount=amount,
+        ),
     )
 
 
@@ -613,6 +673,7 @@ def _candidate_report_periods(snapshot_date: date) -> tuple[str, ...]:
 def _is_suspended(
     record: Mapping[str, Any],
     *,
+    fallback: bool,
     price: float | None,
     volume: float | None,
     amount: float | None,
@@ -630,6 +691,8 @@ def _is_suspended(
     )
     if explicit is not None:
         return explicit
+    if fallback:
+        return True
     if price is None:
         return True
     return volume == 0 and amount == 0

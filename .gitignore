@@ -32,3 +32,10 @@ htmlcov/
 node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+
+
+# Agent runtime
+backend/.pytest-tmp/
+.agent/
+agent.cmd
+agent.sh
